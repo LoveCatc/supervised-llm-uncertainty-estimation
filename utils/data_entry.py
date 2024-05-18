@@ -1,24 +1,24 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Iterator
 
 import datasets
 import pandas as pd
 import transformers
-from tqdm.auto import tqdm
 from loguru import logger
+from tqdm.auto import tqdm
 from transformers import AutoTokenizer
-import re
 
-COQA_LOCAL = "./data/coqa"
-TRIVIA_LOCAL = "./data/trivia_qa"
-MMLU_LOCAL = "./data/mmlu"
-CNN_LOCAL = "./data/cnn_dailymail"
-WMT_LOCAL = "./data/wmt_selected"
-WEBGPT_LOCAL = "./data/webgpt_comparisons"
+COQA_LOCAL = "../data/coqa"
+TRIVIA_LOCAL = "../data/trivia_qa"
+MMLU_LOCAL = "../data/mmlu"
+CNN_LOCAL = "../data/cnn_dailymail"
+WMT_LOCAL = "../data/wmt14"
+WEBGPT_LOCAL = "../data/webgpt_comparisons"
 
-CACHE_LOCAL = "./data_cache"
+CACHE_LOCAL = "../data_cache"
 
 ENTER_PAT = re.compile(r"\n")
 
@@ -44,7 +44,8 @@ def coqa_formatter(
     merged_datasets = {}
 
     caching_path = str(
-        Path(CACHE_LOCAL) / f"coqa_{tokenizer.__class__.__name__}_exmp{num_example}"
+        Path(CACHE_LOCAL)
+        / f"coqa_{tokenizer.__class__.__name__}_exmp{num_example}"
     )
 
     if cache:
@@ -86,7 +87,10 @@ def coqa_formatter(
                                     f"Q: {question}\nA: {answer}"
                                     for question, answer in zip(
                                         [_["question"] for _ in chunk[:-1]],
-                                        [_["answer"]["text"] for _ in chunk[:-1]],
+                                        [
+                                            _["answer"]["text"]
+                                            for _ in chunk[:-1]
+                                        ],
                                     )
                                 ]
                             )
@@ -116,7 +120,9 @@ def coqa_formatter(
 
                             merged_datasets[ds_key].append(
                                 {
-                                    "tokenized_prompt": story + question + answer,
+                                    "tokenized_prompt": story
+                                    + question
+                                    + answer,
                                     "question_token_start_idx": question_start_idx,
                                     "answer_token_start_idx": answer_start_idx,
                                     "answer_str": answer_str,
@@ -125,7 +131,9 @@ def coqa_formatter(
                             )
 
                         else:
-                            logger.warning("no tokenizer offered, printing to stdout")
+                            logger.warning(
+                                "no tokenizer offered, printing to stdout"
+                            )
                             print(story_str + question_str + answer_str)
 
                 batch_cache = []
@@ -161,7 +169,8 @@ def triviaqa_formatter(
     merged_datasets = {}
 
     caching_path = str(
-        Path(CACHE_LOCAL) / f"triviaqa_{tokenizer.__class__.__name__}_exmp{num_example}"
+        Path(CACHE_LOCAL)
+        / f"triviaqa_{tokenizer.__class__.__name__}_exmp{num_example}"
     )
 
     if cache:
@@ -179,7 +188,9 @@ def triviaqa_formatter(
         merged_datasets[ds_key] = []
 
         chunk_cache = []
-        for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+        for idx, ditem in tqdm(
+            enumerate(ds), desc=f"Formatting {ds_key} dataset"
+        ):
             chunk_cache.append(ditem)
 
             if (idx + 1) % step_size == 0:
@@ -230,7 +241,9 @@ def triviaqa_formatter(
                 # finish & clean cache
                 chunk_cache = []
 
-    merged_datasets = {("triviaqa__" + k): v for k, v in merged_datasets.items()}
+    merged_datasets = {
+        ("triviaqa__" + k): v for k, v in merged_datasets.items()
+    }
 
     merged_datasetdict = datasets.DatasetDict(
         {
@@ -273,17 +286,23 @@ def mmlu_formatter(
                 )
 
     data_dirs = [
-        str(Path(_)) for _ in Path(dpath).absolute().glob("*") if Path(_).is_dir()
+        str(Path(_))
+        for _ in Path(dpath).absolute().glob("*")
+        if Path(_).is_dir()
     ]
 
     for f in tqdm(data_dirs, desc="Iterating over files in tar"):
         dd = datasets.load_from_disk(f)
         if merge_split:
-            ds = datasets.concatenate_datasets([dd[split] for split in dd.keys()])
+            ds = datasets.concatenate_datasets(
+                [dd[split] for split in dd.keys()]
+            )
             ds_key = Path(f).stem
             ds_and_key = [(ds, ds_key)]
         else:
-            ds_and_key = [(ds, Path(f).stem + "__" + split) for split, ds in dd.items()]
+            ds_and_key = [
+                (ds, Path(f).stem + "__" + split) for split, ds in dd.items()
+            ]
 
         for ds, ds_key in ds_and_key:
             if ds_key not in merged_datasets:
@@ -291,7 +310,9 @@ def mmlu_formatter(
             chunk_cache = []
             if not conv_generation:
                 for idx, row in tqdm(
-                    enumerate(ds), desc=f"Formatting {ds_key} dataset", leave=False
+                    enumerate(ds),
+                    desc=f"Formatting {ds_key} dataset",
+                    leave=False,
                 ):
                     chunk_cache.append(row)
                     if (idx + 1) % step_size == 0:
@@ -324,7 +345,10 @@ def mmlu_formatter(
                         )
                         answer = f"{chunk_cache[-1]['target']}"
 
-                        if tokenizer is not None and tokenizer.bos_token is not None:
+                        if (
+                            tokenizer is not None
+                            and tokenizer.bos_token is not None
+                        ):
                             prompt_head_tokens = tokenizer.encode(prompt_head)
                             examples_tokens = tokenizer.encode(examples)
                             question_tokens = tokenizer.encode(question)
@@ -350,9 +374,13 @@ def mmlu_formatter(
                                     + examples_tokens
                                     + question_tokens
                                     + answer_tokens,
-                                    "question_token_start_idx": len(prompt_head_tokens)
+                                    "question_token_start_idx": len(
+                                        prompt_head_tokens
+                                    )
                                     + len(examples_tokens),
-                                    "answer_token_start_idx": len(prompt_head_tokens)
+                                    "answer_token_start_idx": len(
+                                        prompt_head_tokens
+                                    )
                                     + len(examples_tokens)
                                     + len(question_tokens),
                                     "answer_str": answer,
@@ -371,7 +399,9 @@ def mmlu_formatter(
 
             else:
                 for idx, row in tqdm(
-                    enumerate(ds), desc=f"Formatting {ds_key} dataset", leave=False
+                    enumerate(ds),
+                    desc=f"Formatting {ds_key} dataset",
+                    leave=False,
                 ):
                     chunk_cache.append(row)
                     if len(chunk_cache) == step_size:
@@ -404,7 +434,10 @@ def mmlu_formatter(
                         )
                         answer = f"{chunk_cache[-1]['target']}"
 
-                        if tokenizer is not None and tokenizer.bos_token is not None:
+                        if (
+                            tokenizer is not None
+                            and tokenizer.bos_token is not None
+                        ):
                             prompt_head_tokens = tokenizer.encode(prompt_head)
                             examples_tokens = tokenizer.encode(examples)
                             question_tokens = tokenizer.encode(question)
@@ -430,9 +463,13 @@ def mmlu_formatter(
                                     + examples_tokens
                                     + question_tokens
                                     + answer_tokens,
-                                    "question_token_start_idx": len(prompt_head_tokens)
+                                    "question_token_start_idx": len(
+                                        prompt_head_tokens
+                                    )
                                     + len(examples_tokens),
-                                    "answer_token_start_idx": len(prompt_head_tokens)
+                                    "answer_token_start_idx": len(
+                                        prompt_head_tokens
+                                    )
                                     + len(examples_tokens)
                                     + len(question_tokens),
                                     "answer_str": answer,
@@ -477,7 +514,8 @@ def cnndaily_formatter(
     merged_datasets = {}
 
     caching_path = str(
-        Path(CACHE_LOCAL) / f"cnndaily_{tokenizer.__class__.__name__}_exmp{num_example}"
+        Path(CACHE_LOCAL)
+        / f"cnndaily_{tokenizer.__class__.__name__}_exmp{num_example}"
     )
 
     if cache:
@@ -495,7 +533,9 @@ def cnndaily_formatter(
         merged_datasets[ds_key] = []
 
         chunk_cache = []
-        for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+        for idx, ditem in tqdm(
+            enumerate(ds), desc=f"Formatting {ds_key} dataset"
+        ):
 
             chunk_cache.append(ditem)
 
@@ -554,7 +594,9 @@ def cnndaily_formatter(
 
                 chunk_cache = []
 
-    merged_datasets = {("cnndaily__" + k): v for k, v in merged_datasets.items()}
+    merged_datasets = {
+        ("cnndaily__" + k): v for k, v in merged_datasets.items()
+    }
 
     merged_datasetdict = datasets.DatasetDict(
         {
@@ -579,7 +621,9 @@ def cnndailymail_formatter(
     step_size = 1 + n_shot
     merged_datasets = {}
 
-    caching_path = str(Path(CACHE_LOCAL) / f"coqa_nexmp{n_shot}_{Path(path).name}")
+    caching_path = str(
+        Path(CACHE_LOCAL) / f"coqa_nexmp{n_shot}_{Path(path).name}"
+    )
 
     if cache:
         if Path(caching_path).exists():
@@ -593,7 +637,9 @@ def cnndailymail_formatter(
         merged_datasets[ds_key] = []
 
         chunk_cache = []
-        for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+        for idx, ditem in tqdm(
+            enumerate(ds), desc=f"Formatting {ds_key} dataset"
+        ):
 
             chunk_cache.append(ditem)
 
@@ -635,7 +681,8 @@ def cnndailymail_formatter(
                         "tokenized_prompt": prompt_tokens
                         + question_tokens
                         + answer_tokens,
-                        "tokenized_prompt_no_answer": prompt_tokens + question_tokens,
+                        "tokenized_prompt_no_answer": prompt_tokens
+                        + question_tokens,
                         "question_token_start_idx": question_start_idx,
                         "answer_token_start_idx": answer_start_idx,
                     }
@@ -643,7 +690,9 @@ def cnndailymail_formatter(
 
                 chunk_cache = []
 
-    merged_datasets = {("cnndaily__" + k): v for k, v in merged_datasets.items()}
+    merged_datasets = {
+        ("cnndaily__" + k): v for k, v in merged_datasets.items()
+    }
 
     merged_datasetdict = datasets.DatasetDict(
         {
@@ -691,7 +740,9 @@ def wmt_formatter(
         merged_datasets[ds_key] = []
         chunk_cache = []
         if not conv_generation:
-            for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+            for idx, ditem in tqdm(
+                enumerate(ds), desc=f"Formatting {ds_key} dataset"
+            ):
 
                 chunk_cache.append(ditem)
 
@@ -725,7 +776,9 @@ def wmt_formatter(
                             answer_tokens = answer_tokens[1:]
 
                         question_start_idx = len(prompt_tokens)
-                        answer_start_idx = question_start_idx + len(question_tokens)
+                        answer_start_idx = question_start_idx + len(
+                            question_tokens
+                        )
 
                         merged_datasets[ds_key].append(
                             {
@@ -743,7 +796,9 @@ def wmt_formatter(
 
                     chunk_cache = []
         else:
-            for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+            for idx, ditem in tqdm(
+                enumerate(ds), desc=f"Formatting {ds_key} dataset"
+            ):
 
                 chunk_cache.append(ditem)
 
@@ -777,7 +832,9 @@ def wmt_formatter(
                             answer_tokens = answer_tokens[1:]
 
                         question_start_idx = len(prompt_tokens)
-                        answer_start_idx = question_start_idx + len(question_tokens)
+                        answer_start_idx = question_start_idx + len(
+                            question_tokens
+                        )
 
                         merged_datasets[ds_key].append(
                             {
@@ -824,7 +881,8 @@ def webgpt_formatter(
     IDX_PATTERN = re.compile(r"\s*\[\d+.*\]\s*")
 
     caching_path = str(
-        Path(CACHE_LOCAL) / f"webgpt_{tokenizer.__class__.__name__}_exmp{num_example}"
+        Path(CACHE_LOCAL)
+        / f"webgpt_{tokenizer.__class__.__name__}_exmp{num_example}"
     )
 
     if cache:
@@ -840,7 +898,9 @@ def webgpt_formatter(
 
         chunk_cache = []
         if not conv_generation:
-            for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+            for idx, ditem in tqdm(
+                enumerate(ds), desc=f"Formatting {ds_key} dataset"
+            ):
                 if ditem["score_0"] == 0 and ditem["score_1"] == 0:
                     continue
                 else:
@@ -877,7 +937,9 @@ def webgpt_formatter(
                             answer_tokens = answer_tokens[1:]
 
                         question_start_idx = len(prompt_tokens)
-                        answer_start_idx = question_start_idx + len(question_tokens)
+                        answer_start_idx = question_start_idx + len(
+                            question_tokens
+                        )
 
                         merged_datasets[ds_key].append(
                             {
@@ -897,7 +959,9 @@ def webgpt_formatter(
 
                     chunk_cache = []
         else:
-            for idx, ditem in tqdm(enumerate(ds), desc=f"Formatting {ds_key} dataset"):
+            for idx, ditem in tqdm(
+                enumerate(ds), desc=f"Formatting {ds_key} dataset"
+            ):
                 if ditem["score_0"] == 0 and ditem["score_1"] == 0:
                     continue
                 else:
@@ -934,7 +998,9 @@ def webgpt_formatter(
                             answer_tokens = answer_tokens[1:]
 
                         question_start_idx = len(prompt_tokens)
-                        answer_start_idx = question_start_idx + len(question_tokens)
+                        answer_start_idx = question_start_idx + len(
+                            question_tokens
+                        )
 
                         merged_datasets[ds_key].append(
                             {
