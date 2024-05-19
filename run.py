@@ -80,10 +80,18 @@ def prepare_model(ctx: click.Context):
 @run.command()
 @click.pass_context
 @click.option(
-    "--models", "-m", multiple=True, type=click.Choice(AVAILABLE_MODELS)
+    "--models",
+    "-m",
+    multiple=True,
+    type=click.Choice(AVAILABLE_MODELS),
+    default=("gemma_7b", "llama_2_7b"),
 )
 @click.option(
-    "--ds", "-d", multiple=True, type=click.Choice(AVAILABLE_DATASETS)
+    "--ds",
+    "-d",
+    multiple=True,
+    type=click.Choice(AVAILABLE_DATASETS),
+    default=("coqa", "triviaqa"),
 )
 def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     """
@@ -131,10 +139,18 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
 @run.command()
 @click.pass_context
 @click.option(
-    "--models", "-m", multiple=True, type=click.Choice(AVAILABLE_MODELS)
+    "--models",
+    "-m",
+    multiple=True,
+    type=click.Choice(AVAILABLE_MODELS),
+    default=("gemma_7b", "llama_2_7b"),
 )
 @click.option(
-    "--ds", "-d", multiple=True, type=click.Choice(AVAILABLE_DATASETS)
+    "--ds",
+    "-d",
+    multiple=True,
+    type=click.Choice(AVAILABLE_DATASETS),
+    default=("coqa", "triviaqa"),
 )
 def train_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     """
@@ -154,19 +170,27 @@ def train_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
                 )
                 logger.warning(e)
             logger.info(
-                f"Supervised model for {model} on {dataset} trained. You can now run `evaluate-supervised` command to evaluate the model."
+                f"Supervised model for {model} on {dataset} trained. You can now run `eval-supervised` command to evaluate the model."
             )
 
 
 @run.command()
 @click.pass_context
 @click.option(
-    "--models", "-m", multiple=True, type=click.Choice(AVAILABLE_MODELS)
+    "--models",
+    "-m",
+    multiple=True,
+    type=click.Choice(AVAILABLE_MODELS),
+    default=("gemma_7b", "llama_2_7b"),
 )
 @click.option(
-    "--ds", "-d", multiple=True, type=click.Choice(AVAILABLE_DATASETS)
+    "--ds",
+    "-d",
+    multiple=True,
+    type=click.Choice(AVAILABLE_DATASETS),
+    default=("coqa", "triviaqa"),
 )
-def evaluate_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
+def eval_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     """
     Evaluate the supervised uncertainty estimation model.
     """
@@ -193,10 +217,18 @@ def evaluate_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
 @run.command()
 @click.pass_context
 @click.option(
-    "--models", "-m", multiple=True, type=click.Choice(AVAILABLE_MODELS)
+    "--models",
+    "-m",
+    multiple=True,
+    type=click.Choice(AVAILABLE_MODELS),
+    default=("gemma_7b", "llama_2_7b"),
 )
 @click.option(
-    "--ds", "-d", multiple=True, type=click.Choice(AVAILABLE_DATASETS)
+    "--ds",
+    "-d",
+    multiple=True,
+    type=click.Choice(AVAILABLE_DATASETS),
+    default=("coqa", "triviaqa"),
 )
 def prepare_crossmodel(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     """
@@ -222,10 +254,18 @@ def prepare_crossmodel(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
 @run.command()
 @click.pass_context
 @click.option(
-    "--models", "-m", multiple=True, type=click.Choice(AVAILABLE_MODELS)
+    "--models",
+    "-m",
+    multiple=True,
+    type=click.Choice(AVAILABLE_MODELS),
+    default=("gemma_7b", "llama_2_7b"),
 )
 @click.option(
-    "--ds", "-d", multiple=True, type=click.Choice(AVAILABLE_DATASETS)
+    "--ds",
+    "-d",
+    multiple=True,
+    type=click.Choice(AVAILABLE_DATASETS),
+    default=("coqa", "triviaqa"),
 )
 def eval_crossmodel(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     """
