@@ -11,14 +11,14 @@ from loguru import logger
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
-COQA_LOCAL = "../data/coqa"
-TRIVIA_LOCAL = "../data/trivia_qa"
-MMLU_LOCAL = "../data/mmlu"
-CNN_LOCAL = "../data/cnn_dailymail"
-WMT_LOCAL = "../data/wmt14"
-WEBGPT_LOCAL = "../data/webgpt_comparisons"
+COQA_LOCAL = "./data/coqa"
+TRIVIA_LOCAL = "./data/trivia_qa"
+MMLU_LOCAL = "./data/mmlu"
+CNN_LOCAL = "./data/cnn_dailymail"
+WMT_LOCAL = "./data/wmt14"
+WEBGPT_LOCAL = "./data/webgpt_comparisons"
 
-CACHE_LOCAL = "../data_cache"
+CACHE_LOCAL = "./data_cache"
 
 ENTER_PAT = re.compile(r"\n")
 
