@@ -87,6 +87,8 @@ def generate_query_X(
     elif model_type == "llama_2_13b":
         model_path = "Llama-2-13b-hf-local"
         tokenizer_path = "Llama-2-13b-hf-local"
+    else:
+        raise NotImplementedError(f"Model {model_type} not supported")
 
     model_path = "models/" + model_path
     tokenizer_path = "models/" + tokenizer_path
@@ -753,6 +755,8 @@ def generate_answer_X_most(
     elif model_type == "llama_2_7b":
         model_path = "Llama-2-7b-hf-local"
         tokenizer_path = "Llama-2-7b-hf-local"
+    else:
+        raise NotImplementedError(f"Model type {model_type} not supported.")
 
     model_path = "models/" + model_path
     tokenizer_path = "models/" + tokenizer_path
@@ -1208,7 +1212,8 @@ def generate_ask4conf(model_type, dataset_name):
     elif model_type == "llama_2_13b":
         model_path = "Llama-2-13b-hf-local"
         tokenizer_path = "Llama-2-13b-hf-local"
-
+    else:
+        raise NotImplementedError(f"Model {model_type} not supported")
     model_path = "models/" + model_path
     tokenizer_path = "models/" + tokenizer_path
     model, tokenizer = load_llama2(model_path, tokenizer_path)
@@ -1491,6 +1496,8 @@ def generate_query_X_mmlu(model_type, phase):
     elif model_type == "llama_2_13b":
         model_path = "Llama-2-13b-hf-local"
         tokenizer_path = "Llama-2-13b-hf-local"
+    else:
+        raise NotImplementedError(f"Model {model_type} not supported")
 
     model_path = "models/" + model_path
     tokenizer_path = "models/" + tokenizer_path
@@ -1676,6 +1683,8 @@ def generate_answer_X_mmlu(model_type, phase):
     elif model_type == "llama_2_13b":
         model_path = "Llama-2-13b-hf-local"
         tokenizer_path = "Llama-2-13b-hf-local"
+    else:
+        raise NotImplementedError(f"Model {model_type} not supported")
 
     model_path = "models/" + model_path
     tokenizer_path = "models/" + tokenizer_path

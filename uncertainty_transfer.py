@@ -62,6 +62,8 @@ def generate_cross_LLM_data(model_type, dataset_name):
             + dataset_name
             + "_mextend_bleu.json"
         )
+    else:
+        raise NotImplementedError(f"Dataset {dataset_name} not supported.")
 
     with open(data_extend_path) as f:
         data_extend = json.load(f)

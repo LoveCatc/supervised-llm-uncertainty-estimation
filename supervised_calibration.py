@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from funs_feature_selection import lasso_select_k_features
 from joblib import Parallel, delayed
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Lasso, LassoCV
@@ -27,6 +26,7 @@ from utils.calibration_metrics import (
 )
 from utils.funs_feature_selection import (
     correlation_select_k_features,
+    lasso_select_k_features,
     mutual_info_select_k_features,
 )
 from utils.funs_load_X_and_Y import load_MMLU_X_Y, load_X_Y
