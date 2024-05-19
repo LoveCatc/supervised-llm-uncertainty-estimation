@@ -1,3 +1,8 @@
+""" Functions performing supervised uncertainty estimation.
+For the naming issue (uncertainty estimation v.s. calibration),
+please see our paper for details.
+"""
+
 import json
 import os
 import pickle

@@ -58,7 +58,7 @@ def prepare_model(ctx: click.Context):
 @click.pass_context
 def generate_ds(ctx: click.Context):
     """
-    Generate the dataset for supervised calibration,
+    Generate the dataset for supervised uncertainty estimation,
     including features of white-box and grey-box,
     as well as the labels of several target scores.
     """
@@ -67,8 +67,35 @@ def generate_ds(ctx: click.Context):
 
 @run.command()
 @click.pass_context
-def train_model(ctx: click.Context):
+def train_supervised(ctx: click.Context):
     """
-    Train the supervised calibration model.
+    Train the supervised uncertainty estimation model.
+    """
+    pass
+
+
+@run.command()
+@click.pass_context
+def evaluate_supervised(ctx: click.Context):
+    """
+    Evaluate the supervised uncertainty estimation model.
+    """
+    pass
+
+
+@run.command()
+@click.pass_context
+def prepare_crossmodel(ctx: click.Context):
+    """
+    Prepare the cross-model dataset for uncertainty estimation.
+    """
+    pass
+
+
+@run.command()
+@click.pass_context
+def eval_transfer(ctx: click.Context):
+    """
+    Evaluate the transferability of the supervised uncertainty estimation method.
     """
     pass
