@@ -1,0 +1,5 @@
+__pycache__/
+.archive/
+models/
+data/
+figs/
