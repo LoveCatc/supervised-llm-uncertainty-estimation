@@ -22,8 +22,7 @@ timeline
     - generate-ds: generate the supervised dataset described in our paper; note that this step may take a long time to complete.
     - train-supervised: train the supervised uncertainty estimation model.
     - eval-supervised: evaluate the supervised uncertainty estimation model.
-    - prepare-crossmodel: prepare the cross-model uncertainty estimation experiments.
-    - eval-crossmodel: evaluate the cross-model uncertainty estimation experiments.
+    - eval-crossmodel: evaluate the transferability of uncertainty estimation model.
 
 Feel free to report your issues or ask for help on the issues page.
     
