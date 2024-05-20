@@ -9,7 +9,7 @@ timeline
     title Project Timeline
     2024.05.09 : Initial commit
     2024.05.19 : Ready for reproduction
-    very soon  : Submit plotting code : Add LLaMA3 support
+    2024.05.20 : Submit plotting code : Add LLaMA3 support
 ```
 
 ## Usage

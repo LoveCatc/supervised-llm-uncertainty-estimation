@@ -69,45 +69,58 @@ def generate_stopword_stopping_criteria(
         stop_criteria.append(StopWordStoppingCriteria(tokenizer, word))
     return stop_criteria
 
+
 def generate_X(
-    data_model: Literal["llama_2_7b", "gemma_7b","llama_3_8b"],
+    data_model: Literal["llama_2_7b", "gemma_7b", "llama_3_8b"],
     dataset_name: Literal["triviaqa", "coqa", "wmt"],
-    model_type: Literal["llama_2_7b", "gemma_7b","llama_3_8b","gemma_2b","llama_2_13b"],
+    model_type: Literal[
+        "llama_2_7b", "gemma_7b", "llama_3_8b", "gemma_2b", "llama_2_13b"
+    ],
 ):
     output_dir = "test_output"
 
-    if model_type=="llama_2_7b":
+    if model_type == "llama_2_7b":
         model_path = "Llama-2-7b-hf-local"
         tokenizer_path = "Llama-2-7b-hf-local"
 
-    elif model_type=="llama_2_13b":
+    elif model_type == "llama_2_13b":
         model_path = "Llama-2-13b-hf-local"
         tokenizer_path = "Llama-2-13b-hf-local"
 
-    elif model_type=="llama_3_8b":
+    elif model_type == "llama_3_8b":
         model_path = "Llama-3-8b-hf-local"
         tokenizer_path = "Llama-3-8b-hf-local"
 
-    elif model_type=="gemma_7b":
+    elif model_type == "gemma_7b":
         model_path = "gemma-7b"
         tokenizer_path = "gemma-7b"
 
-    elif model_type=="gemma_2b":
+    elif model_type == "gemma_2b":
         model_path = "gemma-2b"
         tokenizer_path = "gemma-2b"
 
-    model,tokenizer = load_llama2(model_path, tokenizer_path)
-    data_extend_path = "./test_output/"+dataset_name+"/"+data_model+"/"+dataset_name+"_mextend.json"
+    model, tokenizer = load_llama2(model_path, tokenizer_path)
+    data_extend_path = (
+        "./test_output/"
+        + dataset_name
+        + "/"
+        + data_model
+        + "/"
+        + dataset_name
+        + "_mextend.json"
+    )
 
     with open(data_extend_path) as f:
         data_extend = json.load(f)
 
-    hidden_state_output_dir = output_dir+'/'+dataset_name+'/'+model_type+'/'
+    hidden_state_output_dir = (
+        output_dir + "/" + dataset_name + "/" + model_type + "/"
+    )
 
-    MOST_ANSWER = 'most_likely_answer'
-    PROMPT_TOKENS = 'tokenized_prompt'
-    Q_BEGIN = 'question_token_start_idx'
-    Q_END = 'answer_token_start_idx'
+    MOST_ANSWER = "most_likely_answer"
+    PROMPT_TOKENS = "tokenized_prompt"
+    Q_BEGIN = "question_token_start_idx"
+    Q_END = "answer_token_start_idx"
     STEP_SIZE = 500
 
     num_queries = 0
@@ -119,12 +132,17 @@ def generate_X(
     answer_strs = [data_extend[i][MOST_ANSWER] for i in range(len(data_extend))]
 
     # tokenize answer_strs without special tokens
-    tokenized_answers = [tokenizer.encode(answer_str, add_special_tokens=False) for answer_str in answer_strs]
+    tokenized_answers = [
+        tokenizer.encode(answer_str, add_special_tokens=False)
+        for answer_str in answer_strs
+    ]
 
     num_queries = len(answer_strs)
 
     if dataset_name.startswith("triviaqa"):
-        data = triviaqa_formatter(tokenizer=tokenizer,num_example=3,cache=True)
+        data = triviaqa_formatter(
+            tokenizer=tokenizer, num_example=3, cache=True
+        )
         data = data[dataset_name]
     elif dataset_name.startswith("coqa"):
         data = coqa_formatter(tokenizer=tokenizer, num_example=3, cache=True)
@@ -133,71 +151,179 @@ def generate_X(
         elif dataset_name.endswith("train"):
             data = data["train"]
     elif dataset_name.startswith("wmt"):
-        data = wmt_formatter(tokenizer=tokenizer, num_example=3, cache=True,conv_generation=True)
+        data = wmt_formatter(
+            tokenizer=tokenizer, num_example=3, cache=True, conv_generation=True
+        )
         data = data[dataset_name]
 
     output_token_average_hidden_states = True
-    len_of_token_hidden_states_output = 1 # if set to zero, then not used
-    get_query_entropies = True # whether to get the entropy of the output token
+    len_of_token_hidden_states_output = 1  # if set to zero, then not used
+    get_query_entropies = True  # whether to get the entropy of the output token
     get_query_probs = True
 
     if model_type == "llama_2_7b" or model_type == "llama_3_8b":
-        layer_list = [16,32]
+        layer_list = [16, 32]
         num_dim = 4096
     elif model_type == "llama_2_13b":
-        layer_list = [20,40]
+        layer_list = [20, 40]
         num_dim = 5120
     elif model_type == "gemma_7b":
-        layer_list = [14,28]
+        layer_list = [14, 28]
         num_dim = 3072
     elif model_type == "gemma_2b":
-        layer_list = [9,18]
+        layer_list = [9, 18]
         num_dim = 2048
 
     num_entropy_statistics = 4
 
     # initialize output_tensor as num_layers x num_queries x num_dim
     if output_token_average_hidden_states:
-        query_output_average_tensor = torch.zeros(( num_queries,len(layer_list), num_dim), dtype=torch.float16)
-        answer_output_average_tensor = torch.zeros(( num_queries,len(layer_list), num_dim), dtype=torch.float16)
+        query_output_average_tensor = torch.zeros(
+            (num_queries, len(layer_list), num_dim), dtype=torch.float16
+        )
+        answer_output_average_tensor = torch.zeros(
+            (num_queries, len(layer_list), num_dim), dtype=torch.float16
+        )
     if len_of_token_hidden_states_output > 0:
-        query_output_last_token_tensor = torch.zeros((num_queries,len(layer_list), len_of_token_hidden_states_output, num_dim), dtype=torch.float16)
-        answer_output_last_token_tensor = torch.zeros((num_queries,len(layer_list), len_of_token_hidden_states_output, num_dim), dtype=torch.float16)
+        query_output_last_token_tensor = torch.zeros(
+            (
+                num_queries,
+                len(layer_list),
+                len_of_token_hidden_states_output,
+                num_dim,
+            ),
+            dtype=torch.float16,
+        )
+        answer_output_last_token_tensor = torch.zeros(
+            (
+                num_queries,
+                len(layer_list),
+                len_of_token_hidden_states_output,
+                num_dim,
+            ),
+            dtype=torch.float16,
+        )
     if get_query_entropies:
-        query_entropy_output_tensor = torch.zeros((num_queries,num_entropy_statistics), dtype=torch.float16)
-        answer_entropy_output_tensor = torch.zeros((num_queries,num_entropy_statistics), dtype=torch.float16)
+        query_entropy_output_tensor = torch.zeros(
+            (num_queries, num_entropy_statistics), dtype=torch.float16
+        )
+        answer_entropy_output_tensor = torch.zeros(
+            (num_queries, num_entropy_statistics), dtype=torch.float16
+        )
     if get_query_probs:
-        query_prob_output_tensor = torch.zeros((num_queries,6),dtype=torch.float16)
-        answer_prob_output_tensor = torch.zeros((num_queries,6),dtype=torch.float16)
+        query_prob_output_tensor = torch.zeros(
+            (num_queries, 6), dtype=torch.float16
+        )
+        answer_prob_output_tensor = torch.zeros(
+            (num_queries, 6), dtype=torch.float16
+        )
 
     # load the tensors if they have existed
 
-    for idx,layer_idx in enumerate(layer_list):
+    for idx, layer_idx in enumerate(layer_list):
         if model_type == data_model:
-            if os.path.exists(hidden_state_output_dir+'answer_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt'):
-                query_output_average_tensor[:,idx,:] = torch.load(hidden_state_output_dir+'query_average_layer_'+str(layer_idx)+'.pt')
-                query_output_last_token_tensor[:,idx,:,:] = torch.load(hidden_state_output_dir+'query_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
-                answer_output_average_tensor[:,idx,:] = torch.load(hidden_state_output_dir+'answer_average_layer_'+str(layer_idx)+'.pt')
-                answer_output_last_token_tensor[:,idx,:,:] = torch.load(hidden_state_output_dir+'answer_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
+            if os.path.exists(
+                hidden_state_output_dir
+                + "answer_last_"
+                + str(len_of_token_hidden_states_output)
+                + "_token_layer_"
+                + str(layer_idx)
+                + ".pt"
+            ):
+                query_output_average_tensor[:, idx, :] = torch.load(
+                    hidden_state_output_dir
+                    + "query_average_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
+                query_output_last_token_tensor[:, idx, :, :] = torch.load(
+                    hidden_state_output_dir
+                    + "query_last_"
+                    + str(len_of_token_hidden_states_output)
+                    + "_token_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
+                answer_output_average_tensor[:, idx, :] = torch.load(
+                    hidden_state_output_dir
+                    + "answer_average_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
+                answer_output_last_token_tensor[:, idx, :, :] = torch.load(
+                    hidden_state_output_dir
+                    + "answer_last_"
+                    + str(len_of_token_hidden_states_output)
+                    + "_token_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
         else:
-            if os.path.exists(hidden_state_output_dir+'cross_answer_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt'):
-                query_output_average_tensor[:,idx,:] = torch.load(hidden_state_output_dir+'cross_query_average_layer_'+str(layer_idx)+'.pt')
-                query_output_last_token_tensor[:,idx,:,:] = torch.load(hidden_state_output_dir+'cross_query_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
-                answer_output_average_tensor[:,idx,:] = torch.load(hidden_state_output_dir+'cross_answer_average_layer_'+str(layer_idx)+'.pt')
-                answer_output_last_token_tensor[:,idx,:,:] = torch.load(hidden_state_output_dir+'cross_answer_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
+            if os.path.exists(
+                hidden_state_output_dir
+                + "cross_answer_last_"
+                + str(len_of_token_hidden_states_output)
+                + "_token_layer_"
+                + str(layer_idx)
+                + ".pt"
+            ):
+                query_output_average_tensor[:, idx, :] = torch.load(
+                    hidden_state_output_dir
+                    + "cross_query_average_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
+                query_output_last_token_tensor[:, idx, :, :] = torch.load(
+                    hidden_state_output_dir
+                    + "cross_query_last_"
+                    + str(len_of_token_hidden_states_output)
+                    + "_token_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
+                answer_output_average_tensor[:, idx, :] = torch.load(
+                    hidden_state_output_dir
+                    + "cross_answer_average_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
+                answer_output_last_token_tensor[:, idx, :, :] = torch.load(
+                    hidden_state_output_dir
+                    + "cross_answer_last_"
+                    + str(len_of_token_hidden_states_output)
+                    + "_token_layer_"
+                    + str(layer_idx)
+                    + ".pt"
+                )
 
     if model_type == data_model:
-        if os.path.exists(hidden_state_output_dir+'query_entropies.pt'):
-            query_entropy_output_tensor = torch.load(hidden_state_output_dir+'query_entropies.pt')
-            query_prob_output_tensor = torch.load(hidden_state_output_dir+'query_probs.pt')
-            answer_entropy_output_tensor = torch.load(hidden_state_output_dir+'answer_entropies.pt')
-            answer_prob_output_tensor = torch.load(hidden_state_output_dir+'answer_probs.pt')
+        if os.path.exists(hidden_state_output_dir + "query_entropies.pt"):
+            query_entropy_output_tensor = torch.load(
+                hidden_state_output_dir + "query_entropies.pt"
+            )
+            query_prob_output_tensor = torch.load(
+                hidden_state_output_dir + "query_probs.pt"
+            )
+            answer_entropy_output_tensor = torch.load(
+                hidden_state_output_dir + "answer_entropies.pt"
+            )
+            answer_prob_output_tensor = torch.load(
+                hidden_state_output_dir + "answer_probs.pt"
+            )
     else:
-        if os.path.exists(hidden_state_output_dir+'cross_query_entropies.pt'):
-            query_entropy_output_tensor = torch.load(hidden_state_output_dir+'cross_query_entropies.pt')
-            query_prob_output_tensor = torch.load(hidden_state_output_dir+'cross_query_probs.pt')
-            answer_entropy_output_tensor = torch.load(hidden_state_output_dir+'cross_answer_entropies.pt')
-            answer_prob_output_tensor = torch.load(hidden_state_output_dir+'cross_answer_probs.pt')
+        if os.path.exists(hidden_state_output_dir + "cross_query_entropies.pt"):
+            query_entropy_output_tensor = torch.load(
+                hidden_state_output_dir + "cross_query_entropies.pt"
+            )
+            query_prob_output_tensor = torch.load(
+                hidden_state_output_dir + "cross_query_probs.pt"
+            )
+            answer_entropy_output_tensor = torch.load(
+                hidden_state_output_dir + "cross_answer_entropies.pt"
+            )
+            answer_prob_output_tensor = torch.load(
+                hidden_state_output_dir + "cross_answer_probs.pt"
+            )
 
     # set the device as the device the model is on
     device = model.device
@@ -206,15 +332,15 @@ def generate_X(
     for data_i, d in tqdm(enumerate(data)):
         if data_i >= num_queries:
             break
-        
+
         # if the data is non-zero, continue
         if torch.sum(torch.abs(answer_entropy_output_tensor[data_i])) > 0:
             continue
 
         q_begin = d[Q_BEGIN]
         q_end = d[Q_END]
-        a_begin = q_end-1
-        a_end = q_end+len(tokenized_answers[data_i])       
+        a_begin = q_end - 1
+        a_end = q_end + len(tokenized_answers[data_i])
         query_prompt_token = d[PROMPT_TOKENS][:q_end]
         answer_token = tokenized_answers[data_i]
         # concatenate the prompt token and the answer token
@@ -223,83 +349,194 @@ def generate_X(
         # convert prompt_token to tensor
         prompt_token = torch.tensor(prompt_token).unsqueeze(0)
         prompt_token = prompt_token.to(device)
-       
+
         outputs = model.forward(prompt_token, output_hidden_states=True)
         hidden_states = outputs.hidden_states
-                
+
         if not os.path.exists(hidden_state_output_dir):
             os.makedirs(hidden_state_output_dir)
 
-        
         if output_token_average_hidden_states:
-            query_output_average_tensor[data_i] = get_average_hidden_states(hidden_states,layer_list, q_begin, q_end, num_dim=num_dim)
-            answer_output_average_tensor[data_i] = get_average_hidden_states(hidden_states,layer_list, a_begin, a_end, num_dim=num_dim)
+            query_output_average_tensor[data_i] = get_average_hidden_states(
+                hidden_states, layer_list, q_begin, q_end, num_dim=num_dim
+            )
+            answer_output_average_tensor[data_i] = get_average_hidden_states(
+                hidden_states, layer_list, a_begin, a_end, num_dim=num_dim
+            )
         if len_of_token_hidden_states_output > 0:
-            query_output_last_token_tensor[data_i] = get_last_token_hidden_states(hidden_states,layer_list, q_end, len_of_token_hidden_states_output,num_dim=num_dim)
-            answer_output_last_token_tensor[data_i] = get_last_token_hidden_states(hidden_states,layer_list, a_end, len_of_token_hidden_states_output,num_dim=num_dim)
+            query_output_last_token_tensor[data_i] = (
+                get_last_token_hidden_states(
+                    hidden_states,
+                    layer_list,
+                    q_end,
+                    len_of_token_hidden_states_output,
+                    num_dim=num_dim,
+                )
+            )
+            answer_output_last_token_tensor[data_i] = (
+                get_last_token_hidden_states(
+                    hidden_states,
+                    layer_list,
+                    a_end,
+                    len_of_token_hidden_states_output,
+                    num_dim=num_dim,
+                )
+            )
 
         if get_query_entropies:
-            query_entropy_output_tensor[data_i,:] = get_entropy_statistics(outputs.logits,q_begin,q_end)
-            answer_entropy_output_tensor[data_i,:] = get_entropy_statistics(outputs.logits,a_begin,a_end)
+            query_entropy_output_tensor[data_i, :] = get_entropy_statistics(
+                outputs.logits, q_begin, q_end
+            )
+            answer_entropy_output_tensor[data_i, :] = get_entropy_statistics(
+                outputs.logits, a_begin, a_end
+            )
 
         if get_query_probs:
-            query_prob_output_tensor[data_i,:] = get_prob_statistics(outputs.logits,prompt_token,q_begin,q_end,query=False)
-            answer_prob_output_tensor[data_i,:] = get_prob_statistics(outputs.logits,prompt_token,a_begin,a_end,query=False)
-        
-        if (data_i+1) % STEP_SIZE == 0 or (data_i+1)==num_queries:
+            query_prob_output_tensor[data_i, :] = get_prob_statistics(
+                outputs.logits, prompt_token, q_begin, q_end, query=False
+            )
+            answer_prob_output_tensor[data_i, :] = get_prob_statistics(
+                outputs.logits, prompt_token, a_begin, a_end, query=False
+            )
+
+        if (data_i + 1) % STEP_SIZE == 0 or (data_i + 1) == num_queries:
             # save the hidden_states output
-            for idx,layer_idx in enumerate(layer_list):
+            for idx, layer_idx in enumerate(layer_list):
                 if model_type == data_model:
-                    torch.save(query_output_average_tensor[:,idx,:], hidden_state_output_dir+'query_average_layer_'+str(layer_idx)+'.pt')
-                    torch.save(query_output_last_token_tensor[:,idx,:,:], hidden_state_output_dir+'query_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
-                    torch.save(answer_output_average_tensor[:,idx,:], hidden_state_output_dir+'answer_average_layer_'+str(layer_idx)+'.pt')
-                    torch.save(answer_output_last_token_tensor[:,idx,:,:], hidden_state_output_dir+'answer_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
-                else:  
-                    torch.save(query_output_average_tensor[:,idx,:], hidden_state_output_dir+'cross_query_average_layer_'+str(layer_idx)+'.pt')
-                    torch.save(query_output_last_token_tensor[:,idx,:,:], hidden_state_output_dir+'cross_query_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
-                    torch.save(answer_output_average_tensor[:,idx,:], hidden_state_output_dir+'cross_answer_average_layer_'+str(layer_idx)+'.pt')
-                    torch.save(answer_output_last_token_tensor[:,idx,:,:], hidden_state_output_dir+'cross_answer_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
+                    torch.save(
+                        query_output_average_tensor[:, idx, :],
+                        hidden_state_output_dir
+                        + "query_average_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                    torch.save(
+                        query_output_last_token_tensor[:, idx, :, :],
+                        hidden_state_output_dir
+                        + "query_last_"
+                        + str(len_of_token_hidden_states_output)
+                        + "_token_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                    torch.save(
+                        answer_output_average_tensor[:, idx, :],
+                        hidden_state_output_dir
+                        + "answer_average_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                    torch.save(
+                        answer_output_last_token_tensor[:, idx, :, :],
+                        hidden_state_output_dir
+                        + "answer_last_"
+                        + str(len_of_token_hidden_states_output)
+                        + "_token_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                else:
+                    torch.save(
+                        query_output_average_tensor[:, idx, :],
+                        hidden_state_output_dir
+                        + "cross_query_average_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                    torch.save(
+                        query_output_last_token_tensor[:, idx, :, :],
+                        hidden_state_output_dir
+                        + "cross_query_last_"
+                        + str(len_of_token_hidden_states_output)
+                        + "_token_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                    torch.save(
+                        answer_output_average_tensor[:, idx, :],
+                        hidden_state_output_dir
+                        + "cross_answer_average_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                    torch.save(
+                        answer_output_last_token_tensor[:, idx, :, :],
+                        hidden_state_output_dir
+                        + "cross_answer_last_"
+                        + str(len_of_token_hidden_states_output)
+                        + "_token_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
 
             if model_type == data_model:
-                torch.save(query_entropy_output_tensor, hidden_state_output_dir+'query_entropies.pt')
-                torch.save(query_prob_output_tensor, hidden_state_output_dir+'query_probs.pt')
-                torch.save(answer_entropy_output_tensor, hidden_state_output_dir+'answer_entropies.pt')
-                torch.save(answer_prob_output_tensor, hidden_state_output_dir+'answer_probs.pt')
+                torch.save(
+                    query_entropy_output_tensor,
+                    hidden_state_output_dir + "query_entropies.pt",
+                )
+                torch.save(
+                    query_prob_output_tensor,
+                    hidden_state_output_dir + "query_probs.pt",
+                )
+                torch.save(
+                    answer_entropy_output_tensor,
+                    hidden_state_output_dir + "answer_entropies.pt",
+                )
+                torch.save(
+                    answer_prob_output_tensor,
+                    hidden_state_output_dir + "answer_probs.pt",
+                )
             else:
-                torch.save(query_entropy_output_tensor, hidden_state_output_dir+'cross_query_entropies.pt')
-                torch.save(query_prob_output_tensor, hidden_state_output_dir+'cross_query_probs.pt')
-                torch.save(answer_entropy_output_tensor, hidden_state_output_dir+'cross_answer_entropies.pt')
-                torch.save(answer_prob_output_tensor, hidden_state_output_dir+'cross_answer_probs.pt')
+                torch.save(
+                    query_entropy_output_tensor,
+                    hidden_state_output_dir + "cross_query_entropies.pt",
+                )
+                torch.save(
+                    query_prob_output_tensor,
+                    hidden_state_output_dir + "cross_query_probs.pt",
+                )
+                torch.save(
+                    answer_entropy_output_tensor,
+                    hidden_state_output_dir + "cross_answer_entropies.pt",
+                )
+                torch.save(
+                    answer_prob_output_tensor,
+                    hidden_state_output_dir + "cross_answer_probs.pt",
+                )
+
 
 def generate_answer_most(
-    model_type: Literal["llama_2_7b", "gemma_7b","llama_3_8b"],
+    model_type: Literal["llama_2_7b", "gemma_7b", "llama_3_8b"],
     dataset_name: Literal["triviaqa", "coqa", "wmt"],
 ):
     output_dir = "test_output"
 
-    if model_type=="gemma_7b":
+    if model_type == "gemma_7b":
         model_path = "gemma-7b"
         tokenizer_path = "gemma-7b"
-    elif model_type=="llama_2_7b":
+    elif model_type == "llama_2_7b":
         model_path = "Llama-2-7b-hf-local"
         tokenizer_path = "Llama-2-7b-hf-local"
-    elif model_type=="llama_3_8b":
+    elif model_type == "llama_3_8b":
         model_path = "Llama-3-8b-hf-local"
         tokenizer_path = "Llama-3-8b-hf-local"
 
-    model,tokenizer = load_llama2(model_path, tokenizer_path)
+    model, tokenizer = load_llama2(model_path, tokenizer_path)
 
+    hidden_state_output_dir = (
+        output_dir + "/" + dataset_name + "/" + model_type + "/"
+    )
 
-    hidden_state_output_dir = output_dir+'/'+dataset_name+'/'+model_type+'/'
+    PROMPT_TOKENS = "tokenized_prompt"
+    Q_END = "answer_token_start_idx"
 
-    PROMPT_TOKENS = 'tokenized_prompt'
-    Q_END = 'answer_token_start_idx'
-
-    dataset_extend_name = dataset_name+'_mextend.json'
-    dataset_extend_path = hidden_state_output_dir +'/'+dataset_extend_name
+    dataset_extend_name = dataset_name + "_mextend.json"
+    dataset_extend_path = hidden_state_output_dir + "/" + dataset_extend_name
 
     if dataset_name.startswith("triviaqa"):
-        data = triviaqa_formatter(tokenizer=tokenizer,num_example=3,cache=True)
+        data = triviaqa_formatter(
+            tokenizer=tokenizer, num_example=3, cache=True
+        )
         data = data[dataset_name]
     elif dataset_name.startswith("coqa"):
         data = coqa_formatter(tokenizer=tokenizer, num_example=3, cache=True)
@@ -308,15 +545,16 @@ def generate_answer_most(
         elif dataset_name.endswith("train"):
             data = data["train"]
     elif dataset_name.startswith("wmt"):
-        data = wmt_formatter(tokenizer=tokenizer, num_example=3, cache=True,conv_generation=True)
+        data = wmt_formatter(
+            tokenizer=tokenizer, num_example=3, cache=True, conv_generation=True
+        )
 
         data = data[dataset_name]
 
-    if dataset_name=="wmt__test":
-        data = list(data.select(range(min(2000,data.num_rows))))
+    if dataset_name == "wmt__test":
+        data = list(data.select(range(min(2000, data.num_rows))))
     else:
-        data = list(data.select(range(min(20000,data.num_rows))))
-
+        data = list(data.select(range(min(20000, data.num_rows))))
 
     # if the path not exists, then create the path
     if not os.path.exists(hidden_state_output_dir):
@@ -330,63 +568,103 @@ def generate_answer_most(
         time1 = time()
         data_extend = list(data)
         time2 = time()
-        print("Time to list the data:", time2-time1)
-        
-    GREEDY = 'most_likely_answer'
+        print("Time to list the data:", time2 - time1)
+
+    GREEDY = "most_likely_answer"
 
     if dataset_name.startswith("triviaqa") or dataset_name.startswith("coqa"):
         MAX_LENGTH_OF_GENERATED_SEQUENCE = 50
         period_words = [
-            'Question:', 
-            'Question:', 
-            '\n', 
-            '\n\n',
-            '\n\n\n',
-            '\n\n\n\n', 
-            '\n\n\n\n\n',
-            '<eos>' ,
-            'Answer:', 
-            'Answer:', 
-            '?',
-            '\nQ',
-            '\nQ:',
-            '\n2.'
-            ]
+            "Question:",
+            "Question:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "Answer:",
+            "Answer:",
+            "?",
+            "\nQ",
+            "\nQ:",
+            "\n2.",
+        ]
         eos_words = [
-            'Question:', 
-            ' Question:', 
-            '\n', 
-            '\n\n',
-            '\n\n\n',
-            '\n\n\n\n', 
-            '\n\n\n\n\n',
-            '<eos>' ,
-            'Answer:', 
-            ' Answer:', 
-            'Q:',
-            '?',
-            '<u>',
-            '<h3>',
-            '\nQ',
-            '\nQ:',
-            '\n2.',
-            'Q',
-            'Q ',
-            '\n Q'
-            ]
-        STEP_SIZE=50
+            "Question:",
+            " Question:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "Answer:",
+            " Answer:",
+            "Q:",
+            "?",
+            "<u>",
+            "<h3>",
+            "\nQ",
+            "\nQ:",
+            "\n2.",
+            "Q",
+            "Q ",
+            "\n Q",
+        ]
+        STEP_SIZE = 50
     elif dataset_name.startswith("cnndaily"):
         MAX_LENGTH_OF_GENERATED_SEQUENCE = 200
-        eos_words = ['<end_of_turn>','end_of_turn','<start_of_turn>','start_of_turn']
+        eos_words = [
+            "<end_of_turn>",
+            "end_of_turn",
+            "<start_of_turn>",
+            "start_of_turn",
+        ]
         STEP_SIZE = 20
     elif dataset_name.startswith("wmt"):
         MAX_LENGTH_OF_GENERATED_SEQUENCE = 100
-        period_words = ['Question:', 'Question:', '\n', '\n\n','\n\n\n','\n\n\n\n', '\n\n\n\n\n','<eos>' ,'Answer:', 'Answer:', 'Q:','?','\nQ','\nQ:','\n2.']
-        eos_words = ['Q:', '\n', '\n\n','\n\n\n','\n\n\n\n', '\n\n\n\n\n','<eos>' ,'A:','</s><s>','\nQ','\nQ:','Q :','Q. ',' Q. ','What is the English']
-        STEP_SIZE=50
-        
+        period_words = [
+            "Question:",
+            "Question:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "Answer:",
+            "Answer:",
+            "Q:",
+            "?",
+            "\nQ",
+            "\nQ:",
+            "\n2.",
+        ]
+        eos_words = [
+            "Q:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "A:",
+            "</s><s>",
+            "\nQ",
+            "\nQ:",
+            "Q :",
+            "Q. ",
+            " Q. ",
+            "What is the English",
+        ]
+        STEP_SIZE = 50
+
     # question_framing_ids = [tokenizer.encode(word,add_special_tokens=False) for word in eos_words]
-    period_token_id = [tokenizer.encode(word,add_special_tokens=False)[0] for word in period_words]
+    period_token_id = [
+        tokenizer.encode(word, add_special_tokens=False)[0]
+        for word in period_words
+    ]
     if model_type == "llama_2_7b":
         period_token_id.append(13)
 
@@ -399,56 +677,63 @@ def generate_answer_most(
 
         for data_i in tqdm(range(len(data_extend))):
             d = data_extend[data_i]
-            
-            
+
             # check if this data has been processed before
             if GREEDY in d:
                 continue
-            
+
             input_length = d[Q_END]
-            
-            prompt_tokens = d[PROMPT_TOKENS][:d[Q_END]]
 
-            prompt_tokens = torch.tensor(prompt_tokens).to(model.device).unsqueeze(0)
+            prompt_tokens = d[PROMPT_TOKENS][: d[Q_END]]
 
+            prompt_tokens = (
+                torch.tensor(prompt_tokens).to(model.device).unsqueeze(0)
+            )
 
             try:
                 answer_token = model.generate(
                     prompt_tokens,
-                    max_length=input_length+MAX_LENGTH_OF_GENERATED_SEQUENCE,
+                    max_length=input_length + MAX_LENGTH_OF_GENERATED_SEQUENCE,
                     num_return_sequences=1,
                     do_sample=False,
-                    eos_token_id=period_token_id
-                    )
+                    eos_token_id=period_token_id,
+                )
             except:
                 answer_token = model.generate(
                     prompt_tokens,
-                    max_length=input_length+MAX_LENGTH_OF_GENERATED_SEQUENCE,
+                    max_length=input_length + MAX_LENGTH_OF_GENERATED_SEQUENCE,
                     num_return_sequences=1,
                     do_sample=True,
                     temperature=TEMPERATURE,
-                    eos_token_id=period_token_id
-                    )
+                    eos_token_id=period_token_id,
+                )
 
-            sequence = tokenizer.decode(answer_token[0][input_length:],skip_special_tokens=True)
-
+            sequence = tokenizer.decode(
+                answer_token[0][input_length:], skip_special_tokens=True
+            )
 
             # truncate the sequence with the first eos word
             for word in eos_words:
                 if word in sequence:
-                    sequence = sequence[:sequence.index(word)]
+                    sequence = sequence[: sequence.index(word)]
                     break
             data_extend[data_i][GREEDY] = sequence
 
-            if (data_i+1)%STEP_SIZE == 0 or data_i == len(data_extend)-1:
-                
+            if (data_i + 1) % STEP_SIZE == 0 or data_i == len(data_extend) - 1:
+
                 # save the extended data
-                with open(dataset_extend_path, 'w') as f:
+                with open(dataset_extend_path, "w") as f:
                     json.dump(data_extend, f)
-            
-            if data_i==100:
-                with open(hidden_state_output_dir +'/'+dataset_name+'_mextend_samples.json', 'w') as f:
-                    json.dump(data_extend[:data_i+1], f)
+
+            if data_i == 100:
+                with open(
+                    hidden_state_output_dir
+                    + "/"
+                    + dataset_name
+                    + "_mextend_samples.json",
+                    "w",
+                ) as f:
+                    json.dump(data_extend[: data_i + 1], f)
 
 
 def generate_y_most_QA(model_type, dataset_name):
@@ -589,33 +874,38 @@ def generate_y_most_WMT(model_type, dataset_name):
                 json.dump(data_extend_rouge, fw)
             break
 
+
 def generate_answers(model_type, dataset_name):
     output_dir = "test_output"
 
-    if model_type=="gemma_7b":
+    if model_type == "gemma_7b":
         model_path = "gemma-7b"
         tokenizer_path = "gemma-7b"
-    elif model_type=="llama_2_7b":
+    elif model_type == "llama_2_7b":
         model_path = "Llama-2-7b-hf-local"
         tokenizer_path = "Llama-2-7b-hf-local"
-    elif model_type=="llama_3_8b":
+    elif model_type == "llama_3_8b":
         model_path = "Llama-3-8b-hf-local"
         tokenizer_path = "Llama-3-8b-hf-local"
 
-    model,tokenizer = load_llama2(model_path, tokenizer_path)
+    model, tokenizer = load_llama2(model_path, tokenizer_path)
 
-    hidden_state_output_dir = output_dir+'/'+dataset_name+'/'+model_type+'/'
+    hidden_state_output_dir = (
+        output_dir + "/" + dataset_name + "/" + model_type + "/"
+    )
 
-    PROMPT_TOKENS = 'tokenized_prompt'
+    PROMPT_TOKENS = "tokenized_prompt"
 
-    Q_END = 'answer_token_start_idx'
+    Q_END = "answer_token_start_idx"
 
     # generate multiple answers and get the features (statistics of entropy of output logits) of answers
-    dataset_extend_name = dataset_name+'_extend.json'
-    dataset_extend_path = hidden_state_output_dir +'/'+dataset_extend_name
+    dataset_extend_name = dataset_name + "_extend.json"
+    dataset_extend_path = hidden_state_output_dir + "/" + dataset_extend_name
 
     if dataset_name.startswith("triviaqa"):
-        data = triviaqa_formatter(tokenizer=tokenizer,num_example=3,cache=True)
+        data = triviaqa_formatter(
+            tokenizer=tokenizer, num_example=3, cache=True
+        )
         data = data[dataset_name]
     elif dataset_name.startswith("coqa"):
         data = coqa_formatter(tokenizer=tokenizer, num_example=3, cache=True)
@@ -624,10 +914,12 @@ def generate_answers(model_type, dataset_name):
         elif dataset_name.endswith("train"):
             data = data["train"]
     elif dataset_name.startswith("wmt"):
-        data = wmt_formatter(tokenizer=tokenizer, num_example=3, cache=True,conv_generation=True)
+        data = wmt_formatter(
+            tokenizer=tokenizer, num_example=3, cache=True, conv_generation=True
+        )
         data = data[dataset_name]
 
-    data = list(data.select(range(min(2000,data.num_rows))))
+    data = list(data.select(range(min(2000, data.num_rows))))
 
     # if the path not exists, then create the path
     if not os.path.exists(hidden_state_output_dir):
@@ -641,31 +933,105 @@ def generate_answers(model_type, dataset_name):
         time1 = time()
         data_extend = list(data)
         time2 = time()
-        print("Time to list the data:", time2-time1)
-        
-    ANSWERS = 'generated_answers'
+        print("Time to list the data:", time2 - time1)
 
+    ANSWERS = "generated_answers"
 
     if dataset_name.startswith("triviaqa") or dataset_name.startswith("coqa"):
         MAX_LENGTH_OF_GENERATED_SEQUENCE = 50
-        period_words = ['Question:', '\n', '\n\n','\n\n\n','\n\n\n\n', '\n\n\n\n\n','<eos>' ,'?','<u>','<h3>','\nQ','\nQ:','\n2.',]
-        eos_words = ['Question:', ' Question:', '\n', '\n\n','\n\n\n','\n\n\n\n', '\n\n\n\n\n','<eos>' ,'Answer:', ' Answer:', 'Q:','?','<u>','<h3>','\nQ','\nQ:','\n2.','Q','Q ','\n Q']
+        period_words = [
+            "Question:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "?",
+            "<u>",
+            "<h3>",
+            "\nQ",
+            "\nQ:",
+            "\n2.",
+        ]
+        eos_words = [
+            "Question:",
+            " Question:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "Answer:",
+            " Answer:",
+            "Q:",
+            "?",
+            "<u>",
+            "<h3>",
+            "\nQ",
+            "\nQ:",
+            "\n2.",
+            "Q",
+            "Q ",
+            "\n Q",
+        ]
         NUM_GENERATION_PER_PROMPT = 10
-        STEP_SIZE=500
+        STEP_SIZE = 500
     elif dataset_name.startswith("cnndaily"):
         MAX_LENGTH_OF_GENERATED_SEQUENCE = 200
-        eos_words = ['<end_of_turn>','end_of_turn','<start_of_turn>','start_of_turn']
+        eos_words = [
+            "<end_of_turn>",
+            "end_of_turn",
+            "<start_of_turn>",
+            "start_of_turn",
+        ]
         NUM_GENERATION_PER_PROMPT = 10
         STEP_SIZE = 20
     elif dataset_name.startswith("wmt"):
         MAX_LENGTH_OF_GENERATED_SEQUENCE = 100
-        period_words = ['Question:', 'Question:', '\n', '\n\n','\n\n\n','\n\n\n\n', '\n\n\n\n\n','<eos>' ,'Answer:', 'Answer:', 'Q:','?','\nQ','\nQ:','\n2.']
-        eos_words = ['Q:', '\n', '\n\n','\n\n\n','\n\n\n\n', '\n\n\n\n\n','<eos>' ,'A:','</s><s>','\nQ','\nQ:','Q :','Q. ',' Q. ','What is the English']
+        period_words = [
+            "Question:",
+            "Question:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "Answer:",
+            "Answer:",
+            "Q:",
+            "?",
+            "\nQ",
+            "\nQ:",
+            "\n2.",
+        ]
+        eos_words = [
+            "Q:",
+            "\n",
+            "\n\n",
+            "\n\n\n",
+            "\n\n\n\n",
+            "\n\n\n\n\n",
+            "<eos>",
+            "A:",
+            "</s><s>",
+            "\nQ",
+            "\nQ:",
+            "Q :",
+            "Q. ",
+            " Q. ",
+            "What is the English",
+        ]
         NUM_GENERATION_PER_PROMPT = 5
-        STEP_SIZE=50
-        
+        STEP_SIZE = 50
+
     # question_framing_ids = [tokenizer.encode(word,add_special_tokens=False) for word in eos_words]
-    period_token_id = [tokenizer.encode(word,add_special_tokens=False)[0] for word in period_words]
+    period_token_id = [
+        tokenizer.encode(word, add_special_tokens=False)[0]
+        for word in period_words
+    ]
     if model_type == "llama_2_7b":
         period_token_id.append(13)
 
@@ -686,30 +1052,49 @@ def generate_answers(model_type, dataset_name):
 
             input_length = d[Q_END]
             data_extend[data_i][ANSWERS] = []
-            prompt_tokens = d[PROMPT_TOKENS][:d[Q_END]]
-            prompt_tokens = torch.tensor(prompt_tokens).to(model.device).unsqueeze(0)
+            prompt_tokens = d[PROMPT_TOKENS][: d[Q_END]]
+            prompt_tokens = (
+                torch.tensor(prompt_tokens).to(model.device).unsqueeze(0)
+            )
 
             for i in range(NUM_GENERATION_PER_PROMPT):
-                answer_token = model.generate(prompt_tokens,max_length=input_length+MAX_LENGTH_OF_GENERATED_SEQUENCE,num_return_sequences=1,do_sample=True,temperature=TEMPERATURE,eos_token_id=period_token_id,top_p=TOP_P)
+                answer_token = model.generate(
+                    prompt_tokens,
+                    max_length=input_length + MAX_LENGTH_OF_GENERATED_SEQUENCE,
+                    num_return_sequences=1,
+                    do_sample=True,
+                    temperature=TEMPERATURE,
+                    eos_token_id=period_token_id,
+                    top_p=TOP_P,
+                )
 
-                sequence = tokenizer.decode(answer_token[0][input_length:],skip_special_tokens=True)
-                
+                sequence = tokenizer.decode(
+                    answer_token[0][input_length:], skip_special_tokens=True
+                )
+
                 # truncate the sequence with the first eos word
                 for word in eos_words:
                     if word in sequence:
-                        sequence = sequence[:sequence.index(word)]
+                        sequence = sequence[: sequence.index(word)]
                         break
                 data_extend[data_i][ANSWERS].append(sequence)
 
-            if (data_i+1)%STEP_SIZE == 0 or data_i == len(data_extend)-1:
-                
+            if (data_i + 1) % STEP_SIZE == 0 or data_i == len(data_extend) - 1:
+
                 # save the extended data
-                with open(dataset_extend_path, 'w') as f:
+                with open(dataset_extend_path, "w") as f:
                     json.dump(data_extend, f)
-            
-            if data_i==100:
-                with open(hidden_state_output_dir +'/'+dataset_name+'_extend_samples.json', 'w') as f:
-                    json.dump(data_extend[:data_i+1], f)
+
+            if data_i == 100:
+                with open(
+                    hidden_state_output_dir
+                    + "/"
+                    + dataset_name
+                    + "_extend_samples.json",
+                    "w",
+                ) as f:
+                    json.dump(data_extend[: data_i + 1], f)
+
 
 def generate_ask4conf(model_type, dataset_name):
     INPUT_KEY = "tokenized_prompt"
@@ -1010,157 +1395,14 @@ def generate_query_X_mmlu(model_type, phase):
     output_dir = "test_output"
 
     if model_type.startswith("gemma"):
-        os.environ["CUDA_VISIBLE_DEVICES"] = '1, 2, 3'
+        os.environ["CUDA_VISIBLE_DEVICES"] = "1, 2, 3"
     else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
-    if model_type=="gemma_7b":
+    if model_type == "gemma_7b":
         model_path = "gemma-7b"
         tokenizer_path = "gemma-7b"
-    elif model_type=="llama_2_7b":
-        model_path = "Llama-2-7b-hf-local"
-        tokenizer_path = "Llama-2-7b-hf-local"
-    elif model_type=="llama_3_8b":
-        model_path = "Llama-3-8b-hf-local"
-        tokenizer_path = "Llama-3-8b-hf-local"
-    elif model_type == "gemma_2b":
-        model_path = "gemma-2b"
-        tokenizer_path = "gemma-2b"
-    elif model_type == "llama_2_13b":
-        model_path = "Llama-2-13b-hf-local"
-        tokenizer_path = "Llama-2-13b-hf-local"
-
-    model,tokenizer = load_llama2(model_path, tokenizer_path)
-
-    # raise error if phase=="train":
-    if phase=="train":
-        raise ValueError("The phase cannot be train")
-
-    hidden_state_output_dir = output_dir+'/MMLU/'+model_type+'/'+phase+'/'
-
-    PROMPT_TOKENS = 'tokenized_prompt'
-    Q_BEGIN = 'question_token_start_idx'
-    Q_END = 'answer_token_start_idx'
-
-
-    data_tasks = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science', 'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics', 'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions']
-
-    output_token_average_hidden_states = True
-    len_of_token_hidden_states_output = 1 # if set to zero, then not used
-    get_query_entropies = True # whether to get the entropy of the output token
-
-    num_entropy_statistics = 4
-    num_letters = 4
-
-    data_total = mmlu_formatter(tokenizer=tokenizer, num_example=5,merge_split=False,conv_generation=True)
-
-
-    # if the path not exists, then create the path
-    if not os.path.exists(hidden_state_output_dir):
-        os.makedirs(hidden_state_output_dir)
-
-        
-    if model_type == "llama_2_7b" or model_type=="llama_3_8b":
-        layer_list = [16,32]
-        num_dim = 4096
-    elif model_type == "gemma_7b":
-        layer_list = [14,28]
-        num_dim = 3072
-    elif model_type == "gemma_2b":
-        layer_list = [9,18]
-        num_dim = 2048
-    elif model_type == "llama_2_13b":
-        layer_list = [20,40]
-        num_dim = 5120
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    with torch.no_grad():
-        for task in tqdm(data_tasks):
-            dataset_name = 'mmlu__'+task+'__'+phase
-            task_output_dir = hidden_state_output_dir+task+'/'
-            if not os.path.exists(task_output_dir):
-                os.makedirs(task_output_dir)
-            if os.path.exists(task_output_dir+'query_logits.pt'):
-                continue
-            data = data_total[dataset_name]
-
-            num_queries = len(data)
-
-            print("queries to be processed: ", num_queries)
-
-            # initialize output_tensor as num_layers x num_queries x num_dim
-            if output_token_average_hidden_states:
-                output_average_tensor = torch.zeros(( num_queries,len(layer_list), num_dim), dtype=torch.float16)
-            if len_of_token_hidden_states_output > 0:
-                output_last_token_tensor = torch.zeros((num_queries,len(layer_list), len_of_token_hidden_states_output, num_dim), dtype=torch.float16)
-            if get_query_entropies:
-                entropy_output_tensor = torch.zeros((num_queries, num_entropy_statistics), dtype=torch.float16)
-
-            logits_output_tensor = torch.zeros((num_queries, num_letters), dtype=torch.float16)
-            letter_tokens = [tokenizer.encode(letter)[1] for letter in ['A','B','C','D']]
-
-            # forward and get features of the query
-            for data_i, d in tqdm(enumerate(data)):
-
-                q_begin = d[Q_BEGIN]
-                q_end = d[Q_END]
-                prompt_token = d[PROMPT_TOKENS][:q_end]
-
-
-                # convert prompt_token to tensor
-                prompt_token = torch.tensor(prompt_token).unsqueeze(0)
-                prompt_token = prompt_token.to(device)
-
-                
-                outputs = model.forward(prompt_token, output_hidden_states=True)
-                hidden_states = outputs.hidden_states
-                logits = outputs.logits
-                logits_output_tensor[data_i,:] = torch.tensor([logits[0,-1,token_idx] for token_idx in letter_tokens],dtype=torch.float16)
-        
-
-            if output_token_average_hidden_states:
-                output_average_tensor[data_i] = get_average_hidden_states(hidden_states,layer_list, q_begin, q_end, num_dim=num_dim)
-            if len_of_token_hidden_states_output > 0:
-                output_last_token_tensor[data_i] = get_last_token_hidden_states(hidden_states,layer_list, q_end, len_of_token_hidden_states_output,num_dim=num_dim)
-
-            if get_query_entropies:
-                entropy_output_tensor[data_i,:] = get_entropy_statistics(outputs.logits,q_begin,q_end)
-                    
-            # save the hidden_states output
-            for idx,layer_idx in enumerate(layer_list):
-                if output_token_average_hidden_states:
-                    torch.save(output_average_tensor[:,idx,:], task_output_dir+'query_average_layer_'+str(layer_idx)+'.pt')
-                if len_of_token_hidden_states_output > 0:
-                    torch.save(output_last_token_tensor[:,idx,:,:], task_output_dir+'query_last_'+str(len_of_token_hidden_states_output)+'_token_layer_'+str(layer_idx)+'.pt')
-
-            # release the memory
-            if output_token_average_hidden_states:
-                del output_average_tensor
-            if len_of_token_hidden_states_output > 0:
-                del output_last_token_tensor
-
-            # save the entropy output
-            if get_query_entropies:
-                torch.save(entropy_output_tensor, task_output_dir+'query_entropies.pt')
-                # release the memory
-                del entropy_output_tensor
-
-            # save the logits output
-            torch.save(logits_output_tensor, task_output_dir+'query_logits.pt')
-
-
-def generate_answer_X_mmlu(model_type, phase):
-    output_dir = "test_output"
-
-    if model_type.startswith("gemma"):
-        os.environ["CUDA_VISIBLE_DEVICES"] = '3, 2'
-    else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
-
-    if model_type=="gemma_7b":
-        model_path = "gemma-7b"
-        tokenizer_path = "gemma-7b"
-    elif model_type=="llama_2_7b":
+    elif model_type == "llama_2_7b":
         model_path = "Llama-2-7b-hf-local"
         tokenizer_path = "Llama-2-7b-hf-local"
     elif model_type == "llama_3_8b":
@@ -1173,64 +1415,383 @@ def generate_answer_X_mmlu(model_type, phase):
         model_path = "Llama-2-13b-hf-local"
         tokenizer_path = "Llama-2-13b-hf-local"
 
-    model,tokenizer = load_llama2(model_path, tokenizer_path)
+    model, tokenizer = load_llama2(model_path, tokenizer_path)
 
     # raise error if phase=="train":
-    if phase=="train":
+    if phase == "train":
         raise ValueError("The phase cannot be train")
 
+    hidden_state_output_dir = (
+        output_dir + "/MMLU/" + model_type + "/" + phase + "/"
+    )
 
-    hidden_state_output_dir = output_dir+'/MMLU/'+model_type+'/'+phase+'/'
+    PROMPT_TOKENS = "tokenized_prompt"
+    Q_BEGIN = "question_token_start_idx"
+    Q_END = "answer_token_start_idx"
 
-    PROMPT_TOKENS = 'tokenized_prompt'
+    data_tasks = [
+        "abstract_algebra",
+        "anatomy",
+        "astronomy",
+        "business_ethics",
+        "clinical_knowledge",
+        "college_biology",
+        "college_chemistry",
+        "college_computer_science",
+        "college_mathematics",
+        "college_medicine",
+        "college_physics",
+        "computer_security",
+        "conceptual_physics",
+        "econometrics",
+        "electrical_engineering",
+        "elementary_mathematics",
+        "formal_logic",
+        "global_facts",
+        "high_school_biology",
+        "high_school_chemistry",
+        "high_school_computer_science",
+        "high_school_european_history",
+        "high_school_geography",
+        "high_school_government_and_politics",
+        "high_school_macroeconomics",
+        "high_school_mathematics",
+        "high_school_microeconomics",
+        "high_school_physics",
+        "high_school_psychology",
+        "high_school_statistics",
+        "high_school_us_history",
+        "high_school_world_history",
+        "human_aging",
+        "human_sexuality",
+        "international_law",
+        "jurisprudence",
+        "logical_fallacies",
+        "machine_learning",
+        "management",
+        "marketing",
+        "medical_genetics",
+        "miscellaneous",
+        "moral_disputes",
+        "moral_scenarios",
+        "nutrition",
+        "philosophy",
+        "prehistory",
+        "professional_accounting",
+        "professional_law",
+        "professional_medicine",
+        "professional_psychology",
+        "public_relations",
+        "security_studies",
+        "sociology",
+        "us_foreign_policy",
+        "virology",
+        "world_religions",
+    ]
 
-    Q_END = 'answer_token_start_idx'
+    output_token_average_hidden_states = True
+    len_of_token_hidden_states_output = 1  # if set to zero, then not used
+    get_query_entropies = True  # whether to get the entropy of the output token
 
+    num_entropy_statistics = 4
+    num_letters = 4
 
-    data_tasks = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 'high_school_chemistry', 'high_school_computer_science', 'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 'high_school_macroeconomics', 'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 'sociology', 'us_foreign_policy', 'virology', 'world_religions']
+    data_total = mmlu_formatter(
+        tokenizer=tokenizer,
+        num_example=5,
+        merge_split=False,
+        conv_generation=True,
+    )
 
-        
-    if model_type == "llama_2_7b" or model_type=="llama_3_8b":
-        layer_list = [16,32]
+    # if the path not exists, then create the path
+    if not os.path.exists(hidden_state_output_dir):
+        os.makedirs(hidden_state_output_dir)
+
+    if model_type == "llama_2_7b" or model_type == "llama_3_8b":
+        layer_list = [16, 32]
         num_dim = 4096
     elif model_type == "gemma_7b":
-        layer_list = [14,28]
+        layer_list = [14, 28]
         num_dim = 3072
     elif model_type == "gemma_2b":
-        layer_list = [9,18]
+        layer_list = [9, 18]
         num_dim = 2048
     elif model_type == "llama_2_13b":
-        layer_list = [20,40]
+        layer_list = [20, 40]
         num_dim = 5120
 
-    data_total = mmlu_formatter(tokenizer=tokenizer, num_example=5,merge_split=False,conv_generation=True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    with torch.no_grad():
+        for task in tqdm(data_tasks):
+            dataset_name = "mmlu__" + task + "__" + phase
+            task_output_dir = hidden_state_output_dir + task + "/"
+            if not os.path.exists(task_output_dir):
+                os.makedirs(task_output_dir)
+            if os.path.exists(task_output_dir + "query_logits.pt"):
+                continue
+            data = data_total[dataset_name]
+
+            num_queries = len(data)
+
+            print("queries to be processed: ", num_queries)
+
+            # initialize output_tensor as num_layers x num_queries x num_dim
+            if output_token_average_hidden_states:
+                output_average_tensor = torch.zeros(
+                    (num_queries, len(layer_list), num_dim), dtype=torch.float16
+                )
+            if len_of_token_hidden_states_output > 0:
+                output_last_token_tensor = torch.zeros(
+                    (
+                        num_queries,
+                        len(layer_list),
+                        len_of_token_hidden_states_output,
+                        num_dim,
+                    ),
+                    dtype=torch.float16,
+                )
+            if get_query_entropies:
+                entropy_output_tensor = torch.zeros(
+                    (num_queries, num_entropy_statistics), dtype=torch.float16
+                )
+
+            logits_output_tensor = torch.zeros(
+                (num_queries, num_letters), dtype=torch.float16
+            )
+            letter_tokens = [
+                tokenizer.encode(letter)[1] for letter in ["A", "B", "C", "D"]
+            ]
+
+            # forward and get features of the query
+            for data_i, d in tqdm(enumerate(data)):
+
+                q_begin = d[Q_BEGIN]
+                q_end = d[Q_END]
+                prompt_token = d[PROMPT_TOKENS][:q_end]
+
+                # convert prompt_token to tensor
+                prompt_token = torch.tensor(prompt_token).unsqueeze(0)
+                prompt_token = prompt_token.to(device)
+
+                outputs = model.forward(prompt_token, output_hidden_states=True)
+                hidden_states = outputs.hidden_states
+                logits = outputs.logits
+                logits_output_tensor[data_i, :] = torch.tensor(
+                    [logits[0, -1, token_idx] for token_idx in letter_tokens],
+                    dtype=torch.float16,
+                )
+
+            if output_token_average_hidden_states:
+                output_average_tensor[data_i] = get_average_hidden_states(
+                    hidden_states, layer_list, q_begin, q_end, num_dim=num_dim
+                )
+            if len_of_token_hidden_states_output > 0:
+                output_last_token_tensor[data_i] = get_last_token_hidden_states(
+                    hidden_states,
+                    layer_list,
+                    q_end,
+                    len_of_token_hidden_states_output,
+                    num_dim=num_dim,
+                )
+
+            if get_query_entropies:
+                entropy_output_tensor[data_i, :] = get_entropy_statistics(
+                    outputs.logits, q_begin, q_end
+                )
+
+            # save the hidden_states output
+            for idx, layer_idx in enumerate(layer_list):
+                if output_token_average_hidden_states:
+                    torch.save(
+                        output_average_tensor[:, idx, :],
+                        task_output_dir
+                        + "query_average_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+                if len_of_token_hidden_states_output > 0:
+                    torch.save(
+                        output_last_token_tensor[:, idx, :, :],
+                        task_output_dir
+                        + "query_last_"
+                        + str(len_of_token_hidden_states_output)
+                        + "_token_layer_"
+                        + str(layer_idx)
+                        + ".pt",
+                    )
+
+            # release the memory
+            if output_token_average_hidden_states:
+                del output_average_tensor
+            if len_of_token_hidden_states_output > 0:
+                del output_last_token_tensor
+
+            # save the entropy output
+            if get_query_entropies:
+                torch.save(
+                    entropy_output_tensor,
+                    task_output_dir + "query_entropies.pt",
+                )
+                # release the memory
+                del entropy_output_tensor
+
+            # save the logits output
+            torch.save(
+                logits_output_tensor, task_output_dir + "query_logits.pt"
+            )
+
+
+def generate_answer_X_mmlu(model_type, phase):
+    output_dir = "test_output"
+
+    if model_type.startswith("gemma"):
+        os.environ["CUDA_VISIBLE_DEVICES"] = "3, 2"
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+
+    if model_type == "gemma_7b":
+        model_path = "gemma-7b"
+        tokenizer_path = "gemma-7b"
+    elif model_type == "llama_2_7b":
+        model_path = "Llama-2-7b-hf-local"
+        tokenizer_path = "Llama-2-7b-hf-local"
+    elif model_type == "llama_3_8b":
+        model_path = "Llama-3-8b-hf-local"
+        tokenizer_path = "Llama-3-8b-hf-local"
+    elif model_type == "gemma_2b":
+        model_path = "gemma-2b"
+        tokenizer_path = "gemma-2b"
+    elif model_type == "llama_2_13b":
+        model_path = "Llama-2-13b-hf-local"
+        tokenizer_path = "Llama-2-13b-hf-local"
+
+    model, tokenizer = load_llama2(model_path, tokenizer_path)
+
+    # raise error if phase=="train":
+    if phase == "train":
+        raise ValueError("The phase cannot be train")
+
+    hidden_state_output_dir = (
+        output_dir + "/MMLU/" + model_type + "/" + phase + "/"
+    )
+
+    PROMPT_TOKENS = "tokenized_prompt"
+
+    Q_END = "answer_token_start_idx"
+
+    data_tasks = [
+        "abstract_algebra",
+        "anatomy",
+        "astronomy",
+        "business_ethics",
+        "clinical_knowledge",
+        "college_biology",
+        "college_chemistry",
+        "college_computer_science",
+        "college_mathematics",
+        "college_medicine",
+        "college_physics",
+        "computer_security",
+        "conceptual_physics",
+        "econometrics",
+        "electrical_engineering",
+        "elementary_mathematics",
+        "formal_logic",
+        "global_facts",
+        "high_school_biology",
+        "high_school_chemistry",
+        "high_school_computer_science",
+        "high_school_european_history",
+        "high_school_geography",
+        "high_school_government_and_politics",
+        "high_school_macroeconomics",
+        "high_school_mathematics",
+        "high_school_microeconomics",
+        "high_school_physics",
+        "high_school_psychology",
+        "high_school_statistics",
+        "high_school_us_history",
+        "high_school_world_history",
+        "human_aging",
+        "human_sexuality",
+        "international_law",
+        "jurisprudence",
+        "logical_fallacies",
+        "machine_learning",
+        "management",
+        "marketing",
+        "medical_genetics",
+        "miscellaneous",
+        "moral_disputes",
+        "moral_scenarios",
+        "nutrition",
+        "philosophy",
+        "prehistory",
+        "professional_accounting",
+        "professional_law",
+        "professional_medicine",
+        "professional_psychology",
+        "public_relations",
+        "security_studies",
+        "sociology",
+        "us_foreign_policy",
+        "virology",
+        "world_religions",
+    ]
+
+    if model_type == "llama_2_7b" or model_type == "llama_3_8b":
+        layer_list = [16, 32]
+        num_dim = 4096
+    elif model_type == "gemma_7b":
+        layer_list = [14, 28]
+        num_dim = 3072
+    elif model_type == "gemma_2b":
+        layer_list = [9, 18]
+        num_dim = 2048
+    elif model_type == "llama_2_13b":
+        layer_list = [20, 40]
+        num_dim = 5120
+
+    data_total = mmlu_formatter(
+        tokenizer=tokenizer,
+        num_example=5,
+        merge_split=False,
+        conv_generation=True,
+    )
 
     # if the path not exists, then create the path
     if not os.path.exists(hidden_state_output_dir):
         os.makedirs(hidden_state_output_dir)
 
     with torch.no_grad():
-        generator = MMLUGenerator(model,tokenizer,layer_list,num_dim)
-        
+        generator = MMLUGenerator(model, tokenizer, layer_list, num_dim)
+
         for task in tqdm(data_tasks):
-            dataset_name = 'mmlu__'+task+'__'+phase
-            task_output_dir = hidden_state_output_dir+task+'/'
+            dataset_name = "mmlu__" + task + "__" + phase
+            task_output_dir = hidden_state_output_dir + task + "/"
             if not os.path.exists(task_output_dir):
                 os.makedirs(task_output_dir)
-            if os.path.exists(task_output_dir+str(layer_list[0])+"_output_answer_X.pt"):
+            if os.path.exists(
+                task_output_dir + str(layer_list[0]) + "_output_answer_X.pt"
+            ):
                 continue
             data = data_total[dataset_name]
             print(len(data))
             num_tokens = 4
-            output_answer_X = torch.zeros((len(data),num_tokens,len(layer_list),num_dim))
+            output_answer_X = torch.zeros(
+                (len(data), num_tokens, len(layer_list), num_dim)
+            )
 
             data = list(data)
-            for i in tqdm(range(0,len(data))):
+            for i in tqdm(range(0, len(data))):
                 d = data[i]
-                prompt_tokens = d[PROMPT_TOKENS][:d[Q_END]]
+                prompt_tokens = d[PROMPT_TOKENS][: d[Q_END]]
                 output_answer_X[i] = generator.generate_single(prompt_tokens)
 
             # save the result
-            
-            for idx,layer_idx in enumerate(layer_list):
-                torch.save(output_answer_X[:,:,idx,:],task_output_dir+str(layer_idx)+'_output_answer_X.pt')
+
+            for idx, layer_idx in enumerate(layer_list):
+                torch.save(
+                    output_answer_X[:, :, idx, :],
+                    task_output_dir + str(layer_idx) + "_output_answer_X.pt",
+                )

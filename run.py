@@ -23,20 +23,20 @@ from supervised_calibration import (
     train_supervised_calibration_mmlu,
 )
 from supervised_generation import (
-    generate_answer_X_mmlu,
     generate_answer_most,
+    generate_answer_X_mmlu,
     generate_answers,
-    generate_X,
     generate_ask4conf,
     generate_query_X_mmlu,
     generate_uncertainty_score,
+    generate_X,
     generate_y_most_QA,
     generate_y_most_WMT,
 )
-from uncertainty_transfer import test_transferability,test_transferability_mmlu
+from uncertainty_transfer import test_transferability, test_transferability_mmlu
 
 AVAILABLE_DATASETS = ("coqa", "triviaqa", "mmlu", "wmt")
-AVAILABLE_MODELS = ("llama_2_7b", "gemma_7b","llama_3_8b")
+AVAILABLE_MODELS = ("llama_2_7b", "gemma_7b", "llama_3_8b")
 
 
 @click.group()
@@ -83,7 +83,7 @@ def prepare_model(ctx: click.Context):
     "-m",
     multiple=True,
     type=click.Choice(AVAILABLE_MODELS),
-    default=("gemma_7b", "llama_2_7b","llama_3_8b"),
+    default=("gemma_7b", "llama_2_7b", "llama_3_8b"),
 )
 @click.option(
     "--ds",
@@ -104,20 +104,24 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
             try:
                 # 1. generate answers using target LLM, distinguish mmlu with others
                 if dataset != "mmlu":
-                    generate_answer_most(model, dataset+"__train")  # type: ignore
+                    generate_answer_most(model, dataset + "__train")  # type: ignore
                     if dataset == "wmt":
-                        generate_answer_most(model,dataset+"__test")
+                        generate_answer_most(model, dataset + "__test")
                 # 2. generate input features for uncertainty estimation
                 if dataset == "mmlu":
                     generate_query_X_mmlu(model, "validation")
                     generate_query_X_mmlu(model, "test")
-                
+
                     generate_answer_X_mmlu(model, "validation")
                     generate_answer_X_mmlu(model, "test")
                 else:
-                    generate_X(model, dataset+"__train", model)# target LLM, dataset, tool LLM
+                    generate_X(
+                        model, dataset + "__train", model
+                    )  # target LLM, dataset, tool LLM
                     if dataset == "wmt":
-                        generate_X(model, dataset+"__test", model) # target LLM, dataset, tool LLM
+                        generate_X(
+                            model, dataset + "__test", model
+                        )  # target LLM, dataset, tool LLM
                 # 3. generate y label, distinguish wmt with others
                 if dataset == "wmt":
                     generate_y_most_WMT(model, dataset)
@@ -127,13 +131,12 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
                 # 4. generate other features/labels
                 generate_ask4conf(model, dataset)
                 if dataset != "mmlu":
-                    if dataset=="wmt":
-                        test_dataset = dataset+"__test"
+                    if dataset == "wmt":
+                        test_dataset = dataset + "__test"
                     else:
-                        test_dataset = dataset+"__train"
-                    generate_answers(model,test_dataset)
+                        test_dataset = dataset + "__train"
+                    generate_answers(model, test_dataset)
                     generate_uncertainty_score(model, test_dataset)
-
 
             except Exception as e:
                 logger.warning(
@@ -152,7 +155,7 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     "-m",
     multiple=True,
     type=click.Choice(AVAILABLE_MODELS),
-    default=("gemma_7b", "llama_2_7b","llama_3_8b"),
+    default=("gemma_7b", "llama_2_7b", "llama_3_8b"),
 )
 @click.option(
     "--ds",
@@ -239,7 +242,9 @@ def eval_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     type=click.Choice(AVAILABLE_DATASETS),
     default=("coqa", "triviaqa"),
 )
-def eval_transferability(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
+def eval_transferability(
+    ctx: click.Context, models: Tuple[str], ds: Tuple[str]
+):
     """
     Evaluate the transferability of the supervised uncertainty estimation method.
     """
@@ -247,11 +252,15 @@ def eval_transferability(ctx: click.Context, models: Tuple[str], ds: Tuple[str])
         for dataset in ds:
             logger.info(f"Evaluating transferability of {model} on {dataset}.")
             try:
-                if dataset=="mmlu":
-                    train_supervised_calibration_mmlu(model, "mmlu", mmlu_tasks="Group1")
-                    train_supervised_calibration_mmlu(model,"mmlu",mmlu_tasks="Group2")
-                    test_transferability_mmlu(model,"Group1")
-                    test_transferability_mmlu(model,"Group2")
+                if dataset == "mmlu":
+                    train_supervised_calibration_mmlu(
+                        model, "mmlu", mmlu_tasks="Group1"
+                    )
+                    train_supervised_calibration_mmlu(
+                        model, "mmlu", mmlu_tasks="Group2"
+                    )
+                    test_transferability_mmlu(model, "Group1")
+                    test_transferability_mmlu(model, "Group2")
                 else:
                     test_transferability(model, dataset)
             except Exception as e:
