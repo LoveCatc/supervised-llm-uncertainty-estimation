@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import *
 
 import click
-import datasets
 from loguru import logger
 
 from data_utils.download_dataset import (
@@ -24,20 +23,20 @@ from supervised_calibration import (
     train_supervised_calibration_mmlu,
 )
 from supervised_generation import (
-    generate_answer_X,
     generate_answer_X_mmlu,
-    generate_answer_X_most,
+    generate_answer_most,
+    generate_answers,
+    generate_X,
     generate_ask4conf,
-    generate_query_X,
     generate_query_X_mmlu,
     generate_uncertainty_score,
     generate_y_most_QA,
     generate_y_most_WMT,
 )
-from uncertainty_transfer import generate_cross_LLM_data, test_transferability
+from uncertainty_transfer import test_transferability,test_transferability_mmlu
 
 AVAILABLE_DATASETS = ("coqa", "triviaqa", "mmlu", "wmt")
-AVAILABLE_MODELS = ("llama_2_7b", "gemma_7b")
+AVAILABLE_MODELS = ("llama_2_7b", "gemma_7b","llama_3_8b")
 
 
 @click.group()
@@ -84,7 +83,7 @@ def prepare_model(ctx: click.Context):
     "-m",
     multiple=True,
     type=click.Choice(AVAILABLE_MODELS),
-    default=("gemma_7b", "llama_2_7b"),
+    default=("gemma_7b", "llama_2_7b","llama_3_8b"),
 )
 @click.option(
     "--ds",
@@ -103,19 +102,22 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
         for dataset in ds:
             logger.info(f"Generating dataset for {model} on {dataset}.")
             try:
-                # 1. generate query, distinguish mmlu with others
+                # 1. generate answers using target LLM, distinguish mmlu with others
+                if dataset != "mmlu":
+                    generate_answer_most(model, dataset+"__train")  # type: ignore
+                    if dataset == "wmt":
+                        generate_answer_most(model,dataset+"__test")
+                # 2. generate input features for uncertainty estimation
                 if dataset == "mmlu":
                     generate_query_X_mmlu(model, "validation")
                     generate_query_X_mmlu(model, "test")
-                else:
-                    generate_query_X(model, dataset)  # type: ignore
-                # 2. generate answer from query, distinguish mmlu with others
-                if dataset == "mmlu":
+                
                     generate_answer_X_mmlu(model, "validation")
                     generate_answer_X_mmlu(model, "test")
                 else:
-                    generate_answer_X(model, dataset)  # type: ignore
-                    generate_answer_X_most(model, dataset)  # type: ignore
+                    generate_X(model, dataset+"__train", model)# target LLM, dataset, tool LLM
+                    if dataset == "wmt":
+                        generate_X(model, dataset+"__test", model) # target LLM, dataset, tool LLM
                 # 3. generate y label, distinguish wmt with others
                 if dataset == "wmt":
                     generate_y_most_WMT(model, dataset)
@@ -124,7 +126,14 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
 
                 # 4. generate other features/labels
                 generate_ask4conf(model, dataset)
-                generate_uncertainty_score(model, dataset)
+                if dataset != "mmlu":
+                    if dataset=="wmt":
+                        test_dataset = dataset+"__test"
+                    else:
+                        test_dataset = dataset+"__train"
+                    generate_answers(model,test_dataset)
+                    generate_uncertainty_score(model, test_dataset)
+
 
             except Exception as e:
                 logger.warning(
@@ -143,7 +152,7 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     "-m",
     multiple=True,
     type=click.Choice(AVAILABLE_MODELS),
-    default=("gemma_7b", "llama_2_7b"),
+    default=("gemma_7b", "llama_2_7b","llama_3_8b"),
 )
 @click.option(
     "--ds",
@@ -230,44 +239,7 @@ def eval_supervised(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     type=click.Choice(AVAILABLE_DATASETS),
     default=("coqa", "triviaqa"),
 )
-def prepare_crossmodel(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
-    """
-    Prepare the cross-model dataset for uncertainty estimation.
-    """
-    for model in models:
-        for dataset in ds:
-            logger.info(
-                f"Preparing cross-model dataset for {model} on {dataset}."
-            )
-            try:
-                generate_cross_LLM_data(model, dataset)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to prepare cross-model dataset for {model} on {dataset}. Please check."
-                )
-                logger.warning(e)
-            logger.info(
-                f"Cross-model dataset for {model} on {dataset} prepared."
-            )
-
-
-@run.command()
-@click.pass_context
-@click.option(
-    "--models",
-    "-m",
-    multiple=True,
-    type=click.Choice(AVAILABLE_MODELS),
-    default=("gemma_7b", "llama_2_7b"),
-)
-@click.option(
-    "--ds",
-    "-d",
-    multiple=True,
-    type=click.Choice(AVAILABLE_DATASETS),
-    default=("coqa", "triviaqa"),
-)
-def eval_crossmodel(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
+def eval_transferability(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
     """
     Evaluate the transferability of the supervised uncertainty estimation method.
     """
@@ -275,7 +247,13 @@ def eval_crossmodel(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
         for dataset in ds:
             logger.info(f"Evaluating transferability of {model} on {dataset}.")
             try:
-                test_transferability(model, dataset)
+                if dataset=="mmlu":
+                    train_supervised_calibration_mmlu(model, "mmlu", mmlu_tasks="Group1")
+                    train_supervised_calibration_mmlu(model,"mmlu",mmlu_tasks="Group2")
+                    test_transferability_mmlu(model,"Group1")
+                    test_transferability_mmlu(model,"Group2")
+                else:
+                    test_transferability(model, dataset)
             except Exception as e:
                 logger.warning(
                     f"Failed to evaluate transferability of {model} on {dataset}. Please check."

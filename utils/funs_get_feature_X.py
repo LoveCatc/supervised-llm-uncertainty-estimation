@@ -37,27 +37,22 @@ def get_last_token_hidden_states(hidden_states,layer_list, q_end, len_of_token_h
     return result
     
 def get_prob_statistics(logits,tokens,q_begin,q_end,query=True):
-    if query:
-        q_begin = max(0,q_begin-1)
-        q_end = q_end-1
-    else:
-        if q_end==q_begin:
-            q_begin = q_end-1
+    tokens = tokens.squeeze()
+
     probs = F.softmax(logits[:,q_begin:q_end,:],dim=2)
-    probs = probs.squeeze()
+    probs = probs.squeeze() # eliminate the dimension 0. the result: [q_end-q_begin x token_vocab_size]
     
     if len(probs.shape)<2: # if q_begin==q_end-1
         probs = probs.unsqueeze(0)
-    tokens = tokens.squeeze()
-    if query:
-        new_probs = torch.stack([probs[i,tokens[i+q_begin]] for i in range(probs.shape[0])],dim=0)
+    
+
+    next_token = torch.argmax(probs[-1,:])
+    if probs.shape[0]>1:
+        new_probs = torch.stack([probs[i,tokens[i+q_begin+1]] for i in range(probs.shape[0]-1)],dim=0)
+        new_probs = torch.cat([new_probs,probs[-1,next_token].unsqueeze(0)],dim=0)
     else:
-        next_token = torch.argmax(probs[-1,:])
-        if probs.shape[0]>1:
-            new_probs = torch.stack([probs[i,tokens[i+q_begin+1]] for i in range(probs.shape[0]-1)],dim=0)
-            new_probs = torch.cat([new_probs,probs[-1,next_token].unsqueeze(0)],dim=0)
-        else:
-            new_probs = probs[-1,next_token].unsqueeze(0)
+        new_probs = probs[-1,next_token].unsqueeze(0)
+
     probs = new_probs
     probs_max = torch.max(-probs)
     probs_min = torch.min(-probs)
@@ -72,12 +67,9 @@ def get_prob_statistics(logits,tokens,q_begin,q_end,query=True):
     else:
         probs_std = torch.std(-probs)
         probs_log_std = torch.std(-torch.log(probs+1e-10))
-    try:
-        result = torch.stack([probs_max, probs_min, probs_mean, probs_std, probs_log_mean, probs_log_std],dim=0)
-    except:
-        print(probs)
-        print(probs_max)
-        print(probs_log_std)
+
+    result = torch.stack([probs_max, probs_min, probs_mean, probs_std, probs_log_mean, probs_log_std],dim=0)
+
     return result
 
 def get_entropy_statistics(logits,q_begin,q_end,query=True):
