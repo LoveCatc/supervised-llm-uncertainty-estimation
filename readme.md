@@ -1,6 +1,6 @@
 # Supervised LLM Uncertainty Estimation & Quantification
 
-This paper contains all the code used in the paper: "Uncertainty Estimation and Quantification for LLMs: A Simple Supervised Approach".
+This repo contains all the code used in the paper: "Uncertainty Estimation and Quantification for LLMs: A Simple Supervised Approach".
 
 See the paper for more details: https://arxiv.org/abs/2404.15993.
 
