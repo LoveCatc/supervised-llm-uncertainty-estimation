@@ -17,8 +17,8 @@ timeline
 0. Clone the repository to your local machine.
 1. Prepare the environment with conda: `conda env create -f environment.yaml`.
 2. Use `python run.py` to prepare the data and run the main experiments. We recommend running in the following order:
-    - prepare-data: download all the raw datasets used in our experiment.
-    - prepare-model: prepare the pre-trained models used in our experiment.
+    - prepare-data: download all the raw datasets used in our experiment. (If you want to change the data, refer to the function `prepare_data`)
+    - prepare-model: prepare the pre-trained models used in our experiment. (If you want to try other models, refer to the function `prepare_model`)
     - generate-ds: generate the supervised dataset described in our paper; note that this step may take a long time to complete.
     - train-supervised: train the supervised uncertainty estimation model.
     - eval-supervised: evaluate the supervised uncertainty estimation model.

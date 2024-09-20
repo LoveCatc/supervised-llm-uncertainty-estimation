@@ -71,9 +71,9 @@ def prepare_model(ctx: click.Context):
     Downloads and prepares the pretrained models on huggingface.
     """
     download_gemma(ctx.obj["model_dir"])
-    download_llama2(ctx.obj["model_dir"])
+    # download_llama2(ctx.obj["model_dir"])
     download_llama3(ctx.obj["model_dir"])
-    download_deberta(ctx.obj["model_dir"])
+    # download_deberta(ctx.obj["model_dir"])
 
 
 @run.command()

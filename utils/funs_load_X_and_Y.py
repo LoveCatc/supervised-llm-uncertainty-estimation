@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from data_entry_new import mmlu_formatter,webgpt_formatter
+from utils.data_entry import mmlu_formatter,webgpt_formatter
 from transformers import AutoTokenizer
 import os
 
