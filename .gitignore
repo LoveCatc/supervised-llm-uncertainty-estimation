@@ -3,3 +3,4 @@ __pycache__/
 models/
 data/
 figs/
+data_cache/
