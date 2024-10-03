@@ -52,4 +52,10 @@ def load_llama2(model_path, tokenizer_path, access_token=None):
     for param in model.parameters():
         param.requires_grad = False
 
+    # we have to handle the case where the tokenizer has an eos but not a pad token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+        model.config.pad_token_id = model.config.eos_token_id
+
     return model, tokenizer
