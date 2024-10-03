@@ -30,7 +30,7 @@ from transformers import (
 
 from data_utils.download_dataset import MMLU_TASKS
 from utils.data_entry import (
-    coqa_formatter,
+    coqa_formatter_hf,
     mmlu_formatter,
     triviaqa_formatter,
     wmt_formatter,
@@ -145,7 +145,7 @@ def generate_X(
         )
         data = data[dataset_name]
     elif dataset_name.startswith("coqa"):
-        data = coqa_formatter(tokenizer=tokenizer, num_example=3, cache=True)
+        data = coqa_formatter_hf(tokenizer=tokenizer, num_example=3, cache=True)
         if dataset_name.endswith("test"):
             data = data["test"]
         elif dataset_name.endswith("train"):
@@ -539,7 +539,7 @@ def generate_answer_most(
         )
         data = data[dataset_name]
     elif dataset_name.startswith("coqa"):
-        data = coqa_formatter(tokenizer=tokenizer, num_example=3, cache=True)
+        data = coqa_formatter_hf(tokenizer=tokenizer, num_example=3, cache=True)
         if dataset_name.endswith("test"):
             data = data["test"]
         elif dataset_name.endswith("train"):
@@ -908,7 +908,7 @@ def generate_answers(model_type, dataset_name):
         )
         data = data[dataset_name]
     elif dataset_name.startswith("coqa"):
-        data = coqa_formatter(tokenizer=tokenizer, num_example=3, cache=True)
+        data = coqa_formatter_hf(tokenizer=tokenizer, num_example=3, cache=True)
         if dataset_name.endswith("test"):
             data = data["test"]
         elif dataset_name.endswith("train"):
@@ -1130,7 +1130,7 @@ def generate_ask4conf(model_type, dataset_name):
 
     if dataset_name.startswith("coqa"):
         ds_name = "coqa"
-        dd = coqa_formatter(tokenizer)
+        dd = coqa_formatter_hf(tokenizer)
     elif dataset_name.startswith("trivia"):
         ds_name = "triviaqa"
         dd = triviaqa_formatter(tokenizer)

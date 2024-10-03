@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from hashlib import sha256
 from pathlib import Path
 from typing import Iterator
 
@@ -31,6 +32,120 @@ def normalize_text(text):
     text = re.sub(r"([.,;?!:])([^\s])", r"\1 \2", text)
 
     return text
+
+
+def coqa_formatter_hf(
+    tokenizer: transformers.PreTrainedTokenizer,
+    dpath: str = COQA_LOCAL,
+    num_example: int = 3,
+    cache: bool = True,
+) -> datasets.DatasetDict:
+    step_size = 1 + num_example
+    dd = datasets.load_from_disk(dpath)
+    merged_datasets = {}
+
+    caching_path = str(
+        Path(CACHE_LOCAL)
+        / f"coqa_{tokenizer.__class__.__name__}_exmp{num_example}"
+    )
+
+    if cache:
+        if Path(caching_path).exists():
+            logger.info(f"Loading cached dataset from {caching_path}")
+            try:
+                merged_datasetdict = datasets.load_from_disk(caching_path)
+                return merged_datasetdict
+            except:
+                logger.warning(
+                    f"Failed to load cached dataset from {caching_path}, need regeneration"
+                )
+
+    # here we manually add "id" column to the dataset based on the "story"
+    dd = dd.map(lambda x: {"id": sha256(x["story"].encode()).hexdigest()})
+
+    for ds_key, ds in dd.items():
+        merged_datasets[ds_key] = []
+
+        batch_cache = []
+        batch_id = None
+
+        for ditem in tqdm(ds, desc=f"Formatting {ds_key} dataset"):
+            if len(ditem["questions"]) < num_example + 1:
+                logger.debug(
+                    f"Skipping {ditem['id']} with {len(ditem['questions'])} questions, need at least {num_example+1}"
+                )
+                continue
+            for i in range(len(ditem["questions"]) - num_example):
+                chunk_low, chunk_high = i, i + num_example
+                story_str = (
+                    f"Reading the passage and answer given questions accordingly.\n\nPassage:\n{ditem['story']}\n\n"
+                    f"Examples:\n"
+                    + "\n".join(
+                        [
+                            f"Q: {question}\nA: {answer}"
+                            for question, answer in zip(
+                                ditem["questions"][chunk_low:chunk_high],
+                                ditem["answers"]["input_text"][
+                                    chunk_low:chunk_high
+                                ],
+                            )
+                        ]
+                    )
+                    + "\n"
+                )
+
+                question_str = f"Q: {ditem['questions'][chunk_high]}\n"
+                answer_str = f"A: {ditem['answers']['input_text'][chunk_high]}"
+
+                if tokenizer is not None:
+                    story = tokenizer.encode(story_str)
+                    question = tokenizer.encode(question_str)
+                    answer = tokenizer.encode(answer_str)
+
+                    if story[-1] == tokenizer.eos_token_id:
+                        story = story[:-1]
+                    if question[-1] == tokenizer.eos_token_id:
+                        question = question[:-1]
+
+                    if answer[0] == tokenizer.bos_token_id:
+                        answer = answer[1:]
+                    if question[0] == tokenizer.bos_token_id:
+                        question = question[1:]
+
+                    question_start_idx = len(story)
+                    answer_start_idx = len(story) + len(question)
+
+                    merged_datasets[ds_key].append(
+                        {
+                            "tokenized_prompt": story + question + answer,
+                            "question_token_start_idx": question_start_idx,
+                            "answer_token_start_idx": answer_start_idx,
+                            "answer_str": answer_str,
+                            "question_str": question_str,
+                        }
+                    )
+
+                else:
+                    logger.warning("no tokenizer offered, printing to stdout")
+                    print(story_str + question_str + answer_str)
+                batch_cache.append(ditem)
+            merged_datasets[ds_key].append(ditem)
+
+        merged_datasetdict = {
+            ("coqa__" + k): v for k, v in merged_datasets.items()
+        }
+
+        merged_datasetdict = datasets.DatasetDict(
+            {
+                k: datasets.Dataset.from_pandas(pd.DataFrame(v))
+                for k, v in merged_datasets.items()
+            }
+        )
+
+        if cache:
+            merged_datasetdict.save_to_disk(caching_path)
+
+        return merged_datasetdict
 
 
 def coqa_formatter(
