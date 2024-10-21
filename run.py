@@ -107,6 +107,13 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
                     generate_answer_most(model, dataset + "__train")  # type: ignore
                     if dataset == "wmt":
                         generate_answer_most(model, dataset + "__test")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to generate query for {model} on {dataset} when calling `generate_answer_most`. Please check."
+                )
+                logger.warning(e)
+                exit(1)
+            try:
                 # 2. generate input features for uncertainty estimation
                 if dataset == "mmlu":
                     generate_query_X_mmlu(model, "validation")
@@ -122,12 +129,25 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
                         generate_X(
                             model, dataset + "__test", model
                         )  # target LLM, dataset, tool LLM
+            except Exception as e:
+                logger.warning(
+                    f"Failed to generate query for {model} on {dataset} when calling `generate_X`. Please check."
+                )
+                logger.warning(e)
+                exit(1)
+            try:
                 # 3. generate y label, distinguish wmt with others
                 if dataset == "wmt":
                     generate_y_most_WMT(model, dataset)
                 else:
                     generate_y_most_QA(model, dataset)
-
+            except Exception as e:
+                logger.warning(
+                    f"Failed to generate query for {model} on {dataset} when calling `generate_y_most`. Please check."
+                )
+                logger.warning(e)
+                exit(1)
+            try:
                 # 4. generate other features/labels
                 generate_ask4conf(model, dataset)
                 if dataset != "mmlu":
@@ -137,12 +157,13 @@ def generate_ds(ctx: click.Context, models: Tuple[str], ds: Tuple[str]):
                         test_dataset = dataset + "__train"
                     generate_answers(model, test_dataset)
                     generate_uncertainty_score(model, test_dataset)
-
             except Exception as e:
                 logger.warning(
-                    f"Failed to generate query for {model} on {dataset}. Please check."
+                    f"Failed to generate query for {model} on {dataset} when generating labels. Please check."
                 )
                 logger.warning(e)
+                exit(1)
+
             logger.info(
                 f"Dataset for {model} on {dataset} generated. You can now run `train-supervised` command to train the supervised model."
             )
